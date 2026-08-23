@@ -45,73 +45,210 @@ class MyAdoptionPage extends StatelessWidget {
 
           return Card(
             margin: const EdgeInsets.only(bottom: 16),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 28,
-                        backgroundColor: Colors.teal.shade100,
-                        child: Icon(
-                          application.pet.icon,
-                          size: 30,
-                          color: Colors.teal,
-                        ),
-                      ),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () {
+                showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(25),
+                    ),
+                  ),
+                  builder: (context) {
+                    return Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Center(
+                            child: Icon(
+                              application.pet.icon,
+                              size: 70,
+                              color: Colors.teal,
+                            ),
+                          ),
 
-                      const SizedBox(width: 15),
+                          const SizedBox(height: 15),
 
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment:
-                          CrossAxisAlignment.start,
-                          children: [
-                            Text(
+                          Center(
+                            child: Text(
                               application.pet.name,
                               style: const TextStyle(
-                                fontSize: 20,
+                                fontSize: 26,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            Text(
+                          ),
+
+                          const SizedBox(height: 5),
+
+                          Center(
+                            child: Text(
                               '${application.pet.type} • ${application.pet.age}',
                               style: const TextStyle(
                                 color: Colors.grey,
+                                fontSize: 16,
                               ),
                             ),
-                          ],
-                        ),
+                          ),
+
+                          const SizedBox(height: 25),
+
+                          const Text(
+                            'Adoption Status',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+
+                          const SizedBox(height: 10),
+
+                          Row(
+                            children: [
+                              _statusBadge(application.status),
+                            ],
+                          ),
+
+                          const SizedBox(height: 15),
+
+                          Text(
+                            _statusMessage(application.status),
+                            style: const TextStyle(
+                              color: Colors.grey,
+                              fontSize: 15,
+                            ),
+                          ),
+
+                          const SizedBox(height: 20),
+
+                          const Text(
+                            'About the Pet',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+
+                          const SizedBox(height: 8),
+
+                          Text(
+                            application.pet.description,
+                            style: const TextStyle(
+                              color: Colors.grey,
+                            ),
+                          ),
+
+                          const SizedBox(height: 25),
+
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: () {
+                                Navigator.pop(context);
+                              },
+                              child: const Text('Close'),
+                            ),
+                          ),
+
+                          const SizedBox(height: 10),
+                        ],
                       ),
+                    );
+                  },
+                );
+              },
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 28,
+                          backgroundColor: Colors.teal.shade100,
+                          child: Icon(
+                            application.pet.icon,
+                            size: 30,
+                            color: Colors.teal,
+                          ),
+                        ),
 
-                      _statusBadge(application.status),
-                    ],
-                  ),
+                        const SizedBox(width: 15),
 
-                  const SizedBox(height: 15),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                application.pet.name,
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Text(
+                                '${application.pet.type} • ${application.pet.age}',
+                                style: const TextStyle(
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
 
-                  const Divider(),
-
-                  const SizedBox(height: 10),
-
-                  const Text(
-                    'Application Status',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
+                        _statusBadge(application.status),
+                      ],
                     ),
-                  ),
 
-                  const SizedBox(height: 5),
+                    const SizedBox(height: 15),
 
-                  Text(
-                    _statusMessage(application.status),
-                    style: const TextStyle(
-                      color: Colors.grey,
+                    const Divider(),
+
+                    const SizedBox(height: 10),
+
+                    const Text(
+                      'Application Status',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                ],
+
+                    const SizedBox(height: 5),
+
+                    Text(
+                      _statusMessage(application.status),
+                      style: const TextStyle(
+                        color: Colors.grey,
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Text(
+                          'View Details',
+                          style: TextStyle(
+                            color: Colors.teal,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        const Icon(
+                          Icons.arrow_forward_ios,
+                          size: 15,
+                          color: Colors.teal,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           );

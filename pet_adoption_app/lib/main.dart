@@ -1,3 +1,6 @@
+import 'models/animal_report.dart';
+import 'report/report_animal_page.dart';
+import 'report/my_reports_page.dart';
 import 'models/adoption_application.dart';
 import 'adoption/my_adoption_page.dart';
 import 'adoption/adoption_form_page.dart';
@@ -546,6 +549,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
   late UserProfile userProfile;
   final List<AdoptionApplication> adoptionApplications = [];
+  List<AnimalReport> animalReports = [];
 
   final List<Pet> pets = [
     Pet(
@@ -864,6 +868,89 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   ),
                 ),
               ),
+            const SizedBox(height: 20),
+
+// REPORT AN ANIMAL
+            Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(
+                  color: Colors.red.shade100,
+                ),
+              ),
+              color: Colors.red.shade50,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ReportAnimalPage(
+                        onReportSubmitted: (report) {
+                          setState(() {
+                            animalReports.add(report);
+                          });
+                        },
+                      ),
+                    ),
+                  );
+                },
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 52,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade100,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.report_problem_outlined,
+                          color: Colors.red.shade700,
+                          size: 28,
+                        ),
+                      ),
+
+                      const SizedBox(width: 14),
+
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Report an Animal',
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              'Found an injured or abandoned animal?',
+                              style: TextStyle(
+                                color: Colors.grey,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      Icon(
+                        Icons.arrow_forward_ios,
+                        size: 18,
+                        color: Colors.red,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 20),
 
             // PET LIST WITH ANIMATION
             ...filteredPets.asMap().entries.map((entry) {
@@ -1105,10 +1192,34 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   ),
                 ),
               ),
+
+
+            ListTile(
+              leading: const Icon(
+                Icons.assignment_outlined,
+                color: Colors.teal,
+              ),
+              title: const Text('My Reports'),
+              subtitle: const Text(
+                'View your submitted animal reports',
+              ),
+              trailing: const Icon(Icons.arrow_forward_ios),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => MyReportsPage(
+                      reports: animalReports,
+                    ),
+                  ),
+                );
+              },
+            ),
           ],
         ),
       ),
     );
+
   }
 
   Widget _buildStatCard(String label, String value, IconData icon) {
