@@ -1,3 +1,6 @@
+import 'models/adoption_application.dart';
+import 'adoption/my_adoption_page.dart';
+import 'adoption/adoption_form_page.dart';
 import 'package:flutter/material.dart';
 
 void main() {
@@ -542,6 +545,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   String sortBy = 'Name';
 
   late UserProfile userProfile;
+  final List<AdoptionApplication> adoptionApplications = [];
 
   final List<Pet> pets = [
     Pet(
@@ -1010,6 +1014,27 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
             const SizedBox(height: 15),
 
+            // MY ADOPTION APPLICATIONS BUTTON
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => MyAdoptionPage(
+                        applications: adoptionApplications,
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.assignment),
+                label: const Text('My Adoption Applications'),
+              ),
+            ),
+
+            const SizedBox(height: 15),
+
             // CONTACT INFO
             Card(
               child: Padding(
@@ -1215,9 +1240,23 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _adoptPet(pet);
+                    onPressed: () async {
+                      final application = await Navigator.push<AdoptionApplication>(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => AdoptionFormPage(
+                            pet: pet,
+                            applicantName: userProfile.name,
+                            applicantEmail: userProfile.email,
+                          ),
+                        ),
+                      );
+
+                      if (application != null) {
+                        setState(() {
+                          adoptionApplications.add(application);
+                        });
+                      }
                     },
                     icon: const Icon(Icons.favorite),
                     label: const Text('Adopt Me'),
