@@ -1,12 +1,25 @@
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'firebase_options.dart';
+
+
 import 'models/animal_report.dart';
 import 'report/report_animal_page.dart';
 import 'report/my_reports_page.dart';
+
 import 'models/adoption_application.dart';
 import 'adoption/my_adoption_page.dart';
 import 'adoption/adoption_form_page.dart';
 import 'package:flutter/material.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
   runApp(const PetAdoptionApp());
 }
 
@@ -31,15 +44,43 @@ class _PetAdoptionAppState extends State<PetAdoptionApp> {
     );
   }
 
-  void _login(String email, String password, String name) {
-    setState(() {
-      isLoggedIn = true;
-      currentUser = UserProfile(
-        name: name,
-        email: email,
-        phone: '+1 (555) 000-0000',
+  Future<void> _login(String email, String password, String name) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+
+      if (user == null) {
+        return;
+      }
+
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      final data = doc.data();
+
+      final userName = data?['name'] ?? name;
+      final userEmail = data?['email'] ?? email;
+
+      setState(() {
+        isLoggedIn = true;
+
+        currentUser = UserProfile(
+          name: userName,
+          email: userEmail,
+          phone: '+1 (555) 000-0000',
+        );
+      });
+    } catch (e) {
+      print('Error loading user profile: $e');
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not load user profile'),
+          backgroundColor: Colors.red,
+        ),
       );
-    });
+    }
   }
 
   void _logout() {
@@ -151,33 +192,71 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  void _handleLogin() {
-    if (emailController.text.isEmpty || passwordController.text.isEmpty) {
+  Future<void> _handleLogin() async {
+    if (emailController.text.isEmpty ||
+        passwordController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill all fields'), backgroundColor: Colors.red),
+        const SnackBar(
+          content: Text('Please fill all fields'),
+          backgroundColor: Colors.red,
+        ),
       );
       return;
     }
 
     setState(() => isLoading = true);
 
-    Future.delayed(const Duration(seconds: 1), () {
-      widget.onLogin(
-        emailController.text,
-        passwordController.text,
-        emailController.text.split('@')[0],
+    try {
+      final credential =
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: emailController.text.trim(),
+        password: passwordController.text,
       );
-      setState(() => isLoading = false);
-    });
+
+      final user = credential.user;
+
+      if (user != null) {
+        widget.onLogin(
+          user.email ?? emailController.text.trim(),
+          passwordController.text,
+          user.email?.split('@')[0] ?? 'User',
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      String message = 'Login failed';
+
+      if (e.code == 'user-not-found') {
+        message = 'No account found with this email';
+      } else if (e.code == 'wrong-password' ||
+          e.code == 'invalid-credential') {
+        message = 'Incorrect email or password';
+      } else if (e.code == 'invalid-email') {
+        message = 'Invalid email address';
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
+    }
   }
 
-  void _handleSignup() {
+  Future<void> _handleSignup() async {
     if (nameController.text.isEmpty ||
         emailController.text.isEmpty ||
         passwordController.text.isEmpty ||
         confirmPasswordController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill all fields'), backgroundColor: Colors.red),
+        const SnackBar(
+          content: Text('Please fill all fields'),
+          backgroundColor: Colors.red,
+        ),
       );
       return;
     }
@@ -204,14 +283,60 @@ class _LoginPageState extends State<LoginPage> {
 
     setState(() => isLoading = true);
 
-    Future.delayed(const Duration(seconds: 1), () {
-      widget.onLogin(
-        emailController.text,
-        passwordController.text,
-        nameController.text,
+    try {
+      final credential =
+      await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: emailController.text.trim(),
+        password: passwordController.text,
       );
-      setState(() => isLoading = false);
-    });
+
+      final user = credential.user;
+
+      if (user != null) {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .set({
+          'name': nameController.text.trim(),
+          'email': emailController.text.trim(),
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+
+        widget.onLogin(
+          emailController.text.trim(),
+          passwordController.text,
+          nameController.text.trim(),
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      String message = 'Signup failed';
+
+      if (e.code == 'email-already-in-use') {
+        message = 'An account already exists with this email';
+      } else if (e.code == 'invalid-email') {
+        message = 'Invalid email address';
+      } else if (e.code == 'weak-password') {
+        message = 'Password is too weak';
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Something went wrong: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
+    }
   }
 
   @override
@@ -545,96 +670,54 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
   String searchText = '';
   String selectedType = 'All';
+
+
   String sortBy = 'Name';
 
   late UserProfile userProfile;
   final List<AdoptionApplication> adoptionApplications = [];
   List<AnimalReport> animalReports = [];
 
-  final List<Pet> pets = [
-    Pet(
-      id: '1',
-      name: 'Buddy',
-      type: 'Dog',
-      age: '2 Years',
-      description:
-          'Buddy is a friendly and playful Golden Retriever who loves people and outdoor adventures.',
-      icon: Icons.pets,
-      price: 250.0,
-      gender: 'Male',
-      isVaccinated: true,
-      healthStatus: 'Excellent',
-    ),
-    Pet(
-      id: '2',
-      name: 'Milo',
-      type: 'Cat',
-      age: '1 Year',
-      description:
-          'Milo is a calm and cute Persian cat looking for a loving family. Perfect for apartments.',
-      icon: Icons.cruelty_free,
-      price: 150.0,
-      gender: 'Male',
-      isVaccinated: true,
-      healthStatus: 'Good',
-    ),
-    Pet(
-      id: '3',
-      name: 'Rocky',
-      type: 'Dog',
-      age: '3 Years',
-      description:
-          'Rocky is an energetic Labrador who loves playing fetch and going on long walks.',
-      icon: Icons.pets,
-      price: 300.0,
-      gender: 'Male',
-      isVaccinated: true,
-      healthStatus: 'Excellent',
-    ),
-    Pet(
-      id: '4',
-      name: 'Luna',
-      type: 'Cat',
-      age: '6 Months',
-      description:
-          'Luna is a playful kitten with beautiful blue eyes. She loves toys and playtime.',
-      icon: Icons.cruelty_free,
-      price: 120.0,
-      gender: 'Female',
-      isVaccinated: false,
-      healthStatus: 'Good',
-    ),
-    Pet(
-      id: '5',
-      name: 'Max',
-      type: 'Dog',
-      age: '4 Years',
-      description:
-          'Max is a well-trained German Shepherd, perfect for families looking for a loyal companion.',
-      icon: Icons.pets,
-      price: 400.0,
-      gender: 'Male',
-      isVaccinated: true,
-      healthStatus: 'Excellent',
-    ),
-    Pet(
-      id: '6',
-      name: 'Whiskers',
-      type: 'Cat',
-      age: '2 Years',
-      description:
-          'Whiskers is an affectionate tabby cat who loves cuddles and sunny windowsills.',
-      icon: Icons.cruelty_free,
-      price: 100.0,
-      gender: 'Female',
-      isVaccinated: true,
-      healthStatus: 'Good',
-    ),
-  ];
+  List<Pet> pets = [];
 
+
+  Future<void> loadPetsFromFirestore() async {
+    try {
+      final snapshot =
+      await FirebaseFirestore.instance.collection('pets').get();
+
+      final loadedPets = snapshot.docs.map((doc) {
+        final data = doc.data();
+
+        return Pet(
+          id: doc.id,
+          name: data['name'] ?? '',
+          type: data['type'] ?? '',
+          age: data['age'] ?? '',
+          description: data['description'] ?? '',
+          icon: data['type'] == 'Dog'
+              ? Icons.pets
+              : Icons.cruelty_free,
+          price: (data['price'] as num?)?.toDouble() ?? 0.0,
+          gender: data['gender'] ?? '',
+          isVaccinated: data['isVaccinated'] ?? false,
+          healthStatus: data['healthStatus'] ?? '',
+        );
+      }).toList();
+
+      setState(() {
+        pets = loadedPets;
+      });
+
+      print('Loaded ${pets.length} pets from Firestore');
+    } catch (e) {
+      print('Error loading pets: $e');
+    }
+  }
   @override
   void initState() {
     super.initState();
+
     animationController = AnimationController(
       duration: const Duration(milliseconds: 1000),
       vsync: this,
@@ -646,6 +729,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     )..forward();
 
     userProfile = widget.user;
+
+    loadPetsFromFirestore();
   }
 
   @override
@@ -1367,6 +1452,29 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                         setState(() {
                           adoptionApplications.add(application);
                         });
+
+                        try {
+                          await FirebaseFirestore.instance
+                              .collection('adoptionApplications')
+                              .add({
+                            'userId': FirebaseAuth.instance.currentUser!.uid,
+                            'id': application.id,
+                            'petId': application.pet.id,
+                            'petName': application.pet.name,
+                            'applicantName': application.applicantName,
+                            'email': application.email,
+                            'phone': application.phone,
+                            'address': application.address,
+                            'reason': application.reason,
+                            'experience': application.experience,
+                            'status': application.status,
+                            'createdAt': FieldValue.serverTimestamp(),
+                          });
+
+                          print('Adoption application saved to Firestore!');
+                        } catch (e) {
+                          print('Error saving adoption application: $e');
+                        }
                       }
                     },
                     icon: const Icon(Icons.favorite),
