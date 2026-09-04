@@ -35,6 +35,8 @@ class _ReportAnimalPageState extends State<ReportAnimalPage> {
     'Other',
   ];
 
+  bool isSubmitting = false;
+
   @override
   void dispose() {
     locationController.dispose();
@@ -42,7 +44,7 @@ class _ReportAnimalPageState extends State<ReportAnimalPage> {
     super.dispose();
   }
 
-  void _submitReport() {
+  Future<void> _submitReport() async {
     if (locationController.text.trim().isEmpty ||
         descriptionController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -53,24 +55,52 @@ class _ReportAnimalPageState extends State<ReportAnimalPage> {
       return;
     }
 
-    final report = AnimalReport(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      animalType: selectedAnimal,
-      location: locationController.text.trim(),
-      condition: selectedCondition,
-      description: descriptionController.text.trim(),
-      date: DateTime.now(),
-    );
+    setState(() {
+      isSubmitting = true;
+    });
 
-    widget.onReportSubmitted(report);
+    try {
+      final report = AnimalReport(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        animalType: selectedAnimal,
+        location: locationController.text.trim(),
+        condition: selectedCondition,
+        description: descriptionController.text.trim(),
+        imagePath: null,
+        date: DateTime.now(),
+        status: 'Pending',
+      );
 
-    Navigator.pop(context);
+      // Send report to main.dart
+      // main.dart will save it to Firestore.
+      await widget.onReportSubmitted(report);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Animal report submitted successfully'),
-      ),
-    );
+      if (!mounted) return;
+
+      setState(() {
+        isSubmitting = false;
+      });
+
+      Navigator.pop(context);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Animal report submitted successfully'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        isSubmitting = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to submit report: $e'),
+        ),
+      );
+    }
   }
 
   @override
@@ -80,46 +110,29 @@ class _ReportAnimalPageState extends State<ReportAnimalPage> {
         title: const Text('Report an Animal'),
         centerTitle: true,
       ),
+
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // PHOTO SECTION
-            Container(
-              width: double.infinity,
-              height: 180,
-              decoration: BoxDecoration(
-                color: Colors.teal.shade50,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: Colors.teal.shade100,
-                ),
+
+            // TITLE
+            const Text(
+              'Report an Animal',
+              style: TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.bold,
               ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.camera_alt,
-                    size: 55,
-                    color: Colors.teal,
-                  ),
-                  const SizedBox(height: 10),
-                  const Text(
-                    'Add Photo',
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 5),
-                  const Text(
-                    'Photo upload can be added later',
-                    style: TextStyle(
-                      color: Colors.grey,
-                    ),
-                  ),
-                ],
+            ),
+
+            const SizedBox(height: 8),
+
+            const Text(
+              'Help us know about an animal that needs attention.',
+              style: TextStyle(
+                color: Colors.grey,
+                fontSize: 15,
               ),
             ),
 
@@ -151,34 +164,12 @@ class _ReportAnimalPageState extends State<ReportAnimalPage> {
                 );
               }).toList(),
               onChanged: (value) {
-                setState(() {
-                  selectedAnimal = value!;
-                });
+                if (value != null) {
+                  setState(() {
+                    selectedAnimal = value;
+                  });
+                }
               },
-            ),
-
-            const SizedBox(height: 20),
-
-            // LOCATION
-            const Text(
-              'Location',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-
-            const SizedBox(height: 8),
-
-            TextField(
-              controller: locationController,
-              decoration: InputDecoration(
-                hintText: 'Where did you find the animal?',
-                prefixIcon: const Icon(Icons.location_on),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
             ),
 
             const SizedBox(height: 20),
@@ -200,7 +191,7 @@ class _ReportAnimalPageState extends State<ReportAnimalPage> {
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
-                prefixIcon: const Icon(Icons.warning_amber),
+                prefixIcon: const Icon(Icons.health_and_safety),
               ),
               items: conditions.map((condition) {
                 return DropdownMenuItem(
@@ -209,10 +200,36 @@ class _ReportAnimalPageState extends State<ReportAnimalPage> {
                 );
               }).toList(),
               onChanged: (value) {
-                setState(() {
-                  selectedCondition = value!;
-                });
+                if (value != null) {
+                  setState(() {
+                    selectedCondition = value;
+                  });
+                }
               },
+            ),
+
+            const SizedBox(height: 20),
+
+            // LOCATION
+            const Text(
+              'Location',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+
+            const SizedBox(height: 8),
+
+            TextField(
+              controller: locationController,
+              decoration: InputDecoration(
+                hintText: 'Enter where you found the animal',
+                prefixIcon: const Icon(Icons.location_on),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
             ),
 
             const SizedBox(height: 20),
@@ -232,8 +249,11 @@ class _ReportAnimalPageState extends State<ReportAnimalPage> {
               controller: descriptionController,
               maxLines: 5,
               decoration: InputDecoration(
-                hintText:
-                'Describe what you saw and what help the animal needs...',
+                hintText: 'Describe the animal and what happened...',
+                prefixIcon: const Padding(
+                  padding: EdgeInsets.only(bottom: 80),
+                  child: Icon(Icons.description),
+                ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -245,21 +265,31 @@ class _ReportAnimalPageState extends State<ReportAnimalPage> {
             // SUBMIT BUTTON
             SizedBox(
               width: double.infinity,
-              height: 52,
-              child: ElevatedButton.icon(
-                onPressed: _submitReport,
-                icon: const Icon(Icons.send),
-                label: const Text(
+              height: 55,
+              child: ElevatedButton(
+                onPressed: isSubmitting ? null : _submitReport,
+                style: ElevatedButton.styleFrom(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: isSubmitting
+                    ? const SizedBox(
+                  height: 24,
+                  width: 24,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                  ),
+                )
+                    : const Text(
                   'Submit Report',
                   style: TextStyle(
-                    fontSize: 16,
+                    fontSize: 17,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
             ),
-
-            const SizedBox(height: 20),
           ],
         ),
       ),

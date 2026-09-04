@@ -1,13 +1,85 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../models/adoption_application.dart';
+import '../main.dart';
 
-class MyAdoptionPage extends StatelessWidget {
-  final List<AdoptionApplication> applications;
-
+class MyAdoptionPage extends StatefulWidget {
   const MyAdoptionPage({
     super.key,
-    required this.applications,
   });
+
+  @override
+  State<MyAdoptionPage> createState() => _MyAdoptionPageState();
+}
+
+class _MyAdoptionPageState extends State<MyAdoptionPage> {
+  List<AdoptionApplication> applications = [];
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    loadApplications();
+  }
+
+  Future<void> loadApplications() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+
+      if (user == null) {
+        setState(() {
+          isLoading = false;
+        });
+        return;
+      }
+
+      final snapshot = await FirebaseFirestore.instance
+          .collection('adoptionApplications')
+          .where('userId', isEqualTo: user.uid)
+          .get();
+
+      final loadedApplications = snapshot.docs.map((doc) {
+        final data = doc.data();
+
+        return AdoptionApplication(
+          id: doc.id,
+          pet: Pet(
+            id: data['petId'] ?? '',
+            name: data['petName'] ?? '',
+            type: data['petType'] ?? 'Unknown',
+            age: data['petAge'] ?? '',
+            description: data['petDescription'] ?? '',
+            icon: data['petType'] == 'Dog'
+                ? Icons.pets
+                : Icons.cruelty_free,
+            price: (data['petPrice'] as num?)?.toDouble() ?? 0.0,
+            gender: data['petGender'] ?? '',
+            isVaccinated: data['petVaccinated'] ?? false,
+            healthStatus: data['petHealthStatus'] ?? '',
+          ),
+          applicantName: data['applicantName'] ?? '',
+          email: data['email'] ?? '',
+          phone: data['phone'] ?? '',
+          address: data['address'] ?? '',
+          reason: data['reason'] ?? '',
+          experience: data['experience'] ?? '',
+          status: data['status'] ?? 'Pending',
+        );
+      }).toList();
+
+      setState(() {
+        applications = loadedApplications;
+        isLoading = false;
+      });
+    } catch (e) {
+      print('Error loading applications: $e');
+
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

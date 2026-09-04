@@ -1,17 +1,19 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'firebase_options.dart';
-
 
 import 'models/animal_report.dart';
 import 'report/report_animal_page.dart';
 import 'report/my_reports_page.dart';
-
 import 'models/adoption_application.dart';
 import 'adoption/my_adoption_page.dart';
 import 'adoption/adoption_form_page.dart';
-import 'package:flutter/material.dart';
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,6 +34,7 @@ class PetAdoptionApp extends StatefulWidget {
 
 class _PetAdoptionAppState extends State<PetAdoptionApp> {
   bool isLoggedIn = false;
+  bool isAdmin = false;
   late UserProfile currentUser;
 
   @override
@@ -44,7 +47,11 @@ class _PetAdoptionAppState extends State<PetAdoptionApp> {
     );
   }
 
-  Future<void> _login(String email, String password, String name) async {
+  Future<void> _login(
+      String email,
+      String password,
+      String name,
+      ) async {
     try {
       final user = FirebaseAuth.instance.currentUser;
 
@@ -61,9 +68,11 @@ class _PetAdoptionAppState extends State<PetAdoptionApp> {
 
       final userName = data?['name'] ?? name;
       final userEmail = data?['email'] ?? email;
+      final role = data?['role'] ?? 'user';
 
       setState(() {
         isLoggedIn = true;
+        isAdmin = role == 'admin';
 
         currentUser = UserProfile(
           name: userName,
@@ -76,16 +85,20 @@ class _PetAdoptionAppState extends State<PetAdoptionApp> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Could not load user profile'),
+          content: Text('Could not load user profile: $e'),
           backgroundColor: Colors.red,
         ),
       );
     }
   }
 
-  void _logout() {
+  Future<void> _logout() async {
+    await FirebaseAuth.instance.signOut();
+
     setState(() {
       isLoggedIn = false;
+      isAdmin = false;
+
       currentUser = UserProfile(
         name: '',
         email: '',
@@ -103,12 +116,364 @@ class _PetAdoptionAppState extends State<PetAdoptionApp> {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
         useMaterial3: true,
       ),
-      home: isLoggedIn
-          ? HomePage(
-              user: currentUser,
-              onLogout: _logout,
-            )
-          : LoginPage(onLogin: _login),
+      home: !isLoggedIn
+          ? LoginPage(onLogin: _login)
+          : isAdmin
+          ? AdminDashboard(
+        onLogout: _logout,
+      )
+          : HomePage(
+        user: currentUser,
+        onLogout: _logout,
+      ),
+    );
+  }
+}
+class AdminDashboard extends StatelessWidget {
+  final VoidCallback onLogout;
+
+  const AdminDashboard({
+    super.key,
+    required this.onLogout,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          'Admin Dashboard',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: onLogout,
+            tooltip: 'Logout',
+          ),
+        ],
+      ),
+
+      body: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Welcome, Admin 👋',
+              style: TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+
+            const SizedBox(height: 8),
+
+            const Text(
+              'Manage your Pet Adoption application',
+              style: TextStyle(
+                color: Colors.grey,
+                fontSize: 15,
+              ),
+            ),
+
+            const SizedBox(height: 30),
+
+            // ANIMAL REPORTS
+            Card(
+              child: ListTile(
+                leading: const Icon(
+                  Icons.report_problem,
+                  size: 35,
+                ),
+                title: const Text(
+                  'Animal Reports',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                subtitle: const Text(
+                  'View and manage reported animals',
+                ),
+                trailing: const Icon(
+                  Icons.arrow_forward_ios,
+                  size: 18,
+                ),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>
+                      const AdminAnimalReportsPage(),
+                    ),
+                  );
+                },
+              ),
+            ),
+
+            const SizedBox(height: 15),
+
+            // ADOPTION APPLICATIONS
+            Card(
+              child: ListTile(
+                leading: const Icon(
+                  Icons.assignment,
+                  size: 35,
+                ),
+                title: const Text(
+                  'Adoption Applications',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                subtitle: const Text(
+                  'View and manage adoption applications',
+                ),
+                trailing: const Icon(
+                  Icons.arrow_forward_ios,
+                  size: 18,
+                ),
+                onTap: () {
+                  // We will connect this next.
+                },
+              ),
+            ),
+
+            const SizedBox(height: 15),
+
+            // PETS
+            Card(
+              child: ListTile(
+                leading: const Icon(
+                  Icons.pets,
+                  size: 35,
+                ),
+                title: const Text(
+                  'Manage Pets',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                subtitle: const Text(
+                  'Add, edit or remove pets',
+                ),
+                trailing: const Icon(
+                  Icons.arrow_forward_ios,
+                  size: 18,
+                ),
+                onTap: () {
+                  // We will connect this later.
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+class AdminAnimalReportsPage extends StatefulWidget {
+  const AdminAnimalReportsPage({super.key});
+
+  @override
+  State<AdminAnimalReportsPage> createState() =>
+      _AdminAnimalReportsPageState();
+}
+
+class _AdminAnimalReportsPageState
+    extends State<AdminAnimalReportsPage> {
+
+  bool isLoading = true;
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> reports = [];
+
+  @override
+  void initState() {
+    super.initState();
+    loadReports();
+  }
+
+  Future<void> loadReports() async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('animalReports')
+          .orderBy('date', descending: true)
+          .get();
+
+      setState(() {
+        reports = snapshot.docs;
+        isLoading = false;
+      });
+    } catch (e) {
+      print('Error loading reports: $e');
+
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+  Future<void> updateReportStatus(
+      String reportId,
+      String newStatus,
+      ) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('animalReports')
+          .doc(reportId)
+          .update({
+        'status': newStatus,
+      });
+
+      await loadReports();
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Report marked as $newStatus'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error updating report: $e'),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          'Animal Reports',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+
+      body: isLoading
+          ? const Center(
+        child: CircularProgressIndicator(),
+      )
+          : reports.isEmpty
+          ? const Center(
+        child: Text(
+          'No animal reports found.',
+          style: TextStyle(
+            fontSize: 16,
+            color: Colors.grey,
+          ),
+        ),
+      )
+          : ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: reports.length,
+        itemBuilder: (context, index) {
+          final report = reports[index].data();
+
+          final status =
+              report['status'] ?? 'Pending';
+
+          return Card(
+            margin: const EdgeInsets.only(
+              bottom: 15,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment:
+                CrossAxisAlignment.start,
+                children: [
+
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.report_problem,
+                        size: 30,
+                      ),
+
+                      const SizedBox(width: 10),
+
+                      Expanded(
+                        child: Text(
+                          report['animalType'] ?? '',
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+
+                      Chip(
+                        label: Text(status),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 15),
+
+                  Text(
+                    'Condition: ${report['condition'] ?? ''}',
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  Text(
+                    'Location: ${report['location'] ?? ''}',
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  Text(
+                    'Description: ${report['description'] ?? ''}',
+                  ),
+
+                  const SizedBox(height: 15),
+
+                  DropdownButtonFormField<String>(
+                    value: status,
+                    decoration:
+                    const InputDecoration(
+                      labelText: 'Update Status',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'Pending',
+                        child: Text('Pending'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'In Progress',
+                        child: Text('In Progress'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'Resolved',
+                        child: Text('Resolved'),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      if (value != null &&
+                          value != status) {
+                        updateReportStatus(
+                          reports[index].id,
+                          value,
+                        );
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 }
@@ -677,7 +1042,62 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   late UserProfile userProfile;
   final List<AdoptionApplication> adoptionApplications = [];
   List<AnimalReport> animalReports = [];
+  Future<void> loadAnimalReports() async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('animalReports')
+          .orderBy('date', descending: true)
+          .get();
 
+      final loadedReports = snapshot.docs.map((doc) {
+        final data = doc.data();
+
+        return AnimalReport(
+          id: doc.id,
+          animalType: data['animalType'] ?? '',
+          location: data['location'] ?? '',
+          condition: data['condition'] ?? '',
+          description: data['description'] ?? '',
+          imagePath: data['imagePath'],
+          date: (data['date'] as Timestamp).toDate(),
+          status: data['status'] ?? 'Pending',
+        );
+      }).toList();
+
+      setState(() {
+        animalReports = loadedReports;
+      });
+
+      print('Loaded ${animalReports.length} animal reports from Firestore');
+    } catch (e) {
+      print('Error loading animal reports: $e');
+    }
+  }
+  Future<void> saveAnimalReport(AnimalReport report) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('animalReports')
+          .doc(report.id)
+          .set({
+        'animalType': report.animalType,
+        'location': report.location,
+        'condition': report.condition,
+        'description': report.description,
+        'imagePath': null,
+        'date': Timestamp.fromDate(report.date),
+        'status': report.status,
+      });
+
+      setState(() {
+        animalReports.add(report);
+      });
+
+      print('Animal report saved successfully');
+    } catch (e) {
+      print('Error saving animal report: $e');
+      rethrow;
+    }
+  }
   List<Pet> pets = [];
 
 
@@ -717,6 +1137,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    loadAnimalReports();
 
     animationController = AnimationController(
       duration: const Duration(milliseconds: 1000),
@@ -972,12 +1393,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     context,
                     MaterialPageRoute(
                       builder: (context) => ReportAnimalPage(
-                        onReportSubmitted: (report) {
-                          setState(() {
-                            animalReports.add(report);
-                          });
-                        },
-                      ),
+                        onReportSubmitted: saveAnimalReport,
+                      )
                     ),
                   );
                 },
@@ -1194,9 +1611,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => MyAdoptionPage(
-                        applications: adoptionApplications,
-                      ),
+                      builder: (context) => MyAdoptionPage(),
                     ),
                   );
                 },
