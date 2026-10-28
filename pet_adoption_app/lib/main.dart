@@ -2,17 +2,16 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'firebase_options.dart';
 
+import 'firebase_options.dart';
 import 'models/animal_report.dart';
 import 'report/report_animal_page.dart';
 import 'report/my_reports_page.dart';
 import 'models/adoption_application.dart';
 import 'adoption/my_adoption_page.dart';
 import 'adoption/adoption_form_page.dart';
+import 'admin/adoption_requests_page.dart';
+import 'admin/manage_pets_page.dart';
 
 
 void main() async {
@@ -180,7 +179,7 @@ class AdminDashboard extends StatelessWidget {
             ),
 
             const SizedBox(height: 30),
-
+          
             // ANIMAL REPORTS
             Card(
               child: ListTile(
@@ -236,7 +235,12 @@ class AdminDashboard extends StatelessWidget {
                   size: 18,
                 ),
                 onTap: () {
-                  // We will connect this next.
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const AdoptionRequestsPage(),
+                    ),
+                  );
                 },
               ),
             ),
@@ -244,6 +248,7 @@ class AdminDashboard extends StatelessWidget {
             const SizedBox(height: 15),
 
             // PETS
+                       // PETS
             Card(
               child: ListTile(
                 leading: const Icon(
@@ -264,16 +269,23 @@ class AdminDashboard extends StatelessWidget {
                   size: 18,
                 ),
                 onTap: () {
-                  // We will connect this later.
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ManagePetsPage(),
+                    ),
+                  );
                 },
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-}
+          ], // Closes Column children
+        ), // Closes Column
+      ), // Closes Padding
+    ); // Closes Scaffold
+  } // Closes build()
+} // Closes AdminDashboard
+
+
 class AdminAnimalReportsPage extends StatefulWidget {
   const AdminAnimalReportsPage({super.key});
 
