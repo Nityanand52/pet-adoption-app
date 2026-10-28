@@ -1,13 +1,85 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../models/adoption_application.dart';
+import '../main.dart';
 
-class MyAdoptionPage extends StatelessWidget {
-  final List<AdoptionApplication> applications;
-
+class MyAdoptionPage extends StatefulWidget {
   const MyAdoptionPage({
     super.key,
-    required this.applications,
   });
+
+  @override
+  State<MyAdoptionPage> createState() => _MyAdoptionPageState();
+}
+
+class _MyAdoptionPageState extends State<MyAdoptionPage> {
+  List<AdoptionApplication> applications = [];
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    loadApplications();
+  }
+
+  Future<void> loadApplications() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+
+      if (user == null) {
+        setState(() {
+          isLoading = false;
+        });
+        return;
+      }
+
+      final snapshot = await FirebaseFirestore.instance
+          .collection('adoptionApplications')
+          .where('userId', isEqualTo: user.uid)
+          .get();
+
+      final loadedApplications = snapshot.docs.map((doc) {
+        final data = doc.data();
+
+        return AdoptionApplication(
+          id: doc.id,
+          pet: Pet(
+            id: data['petId'] ?? '',
+            name: data['petName'] ?? '',
+            type: data['petType'] ?? 'Unknown',
+            age: data['petAge'] ?? '',
+            description: data['petDescription'] ?? '',
+            icon: data['petType'] == 'Dog'
+                ? Icons.pets
+                : Icons.cruelty_free,
+            price: (data['petPrice'] as num?)?.toDouble() ?? 0.0,
+            gender: data['petGender'] ?? '',
+            isVaccinated: data['petVaccinated'] ?? false,
+            healthStatus: data['petHealthStatus'] ?? '',
+          ),
+          applicantName: data['applicantName'] ?? '',
+          email: data['email'] ?? '',
+          phone: data['phone'] ?? '',
+          address: data['address'] ?? '',
+          reason: data['reason'] ?? '',
+          experience: data['experience'] ?? '',
+          status: data['status'] ?? 'Pending',
+        );
+      }).toList();
+
+      setState(() {
+        applications = loadedApplications;
+        isLoading = false;
+      });
+    } catch (e) {
+      print('Error loading applications: $e');
+
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -45,73 +117,210 @@ class MyAdoptionPage extends StatelessWidget {
 
           return Card(
             margin: const EdgeInsets.only(bottom: 16),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 28,
-                        backgroundColor: Colors.teal.shade100,
-                        child: Icon(
-                          application.pet.icon,
-                          size: 30,
-                          color: Colors.teal,
-                        ),
-                      ),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () {
+                showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(25),
+                    ),
+                  ),
+                  builder: (context) {
+                    return Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Center(
+                            child: Icon(
+                              application.pet.icon,
+                              size: 70,
+                              color: Colors.teal,
+                            ),
+                          ),
 
-                      const SizedBox(width: 15),
+                          const SizedBox(height: 15),
 
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment:
-                          CrossAxisAlignment.start,
-                          children: [
-                            Text(
+                          Center(
+                            child: Text(
                               application.pet.name,
                               style: const TextStyle(
-                                fontSize: 20,
+                                fontSize: 26,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            Text(
+                          ),
+
+                          const SizedBox(height: 5),
+
+                          Center(
+                            child: Text(
                               '${application.pet.type} • ${application.pet.age}',
                               style: const TextStyle(
                                 color: Colors.grey,
+                                fontSize: 16,
                               ),
                             ),
-                          ],
-                        ),
+                          ),
+
+                          const SizedBox(height: 25),
+
+                          const Text(
+                            'Adoption Status',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+
+                          const SizedBox(height: 10),
+
+                          Row(
+                            children: [
+                              _statusBadge(application.status),
+                            ],
+                          ),
+
+                          const SizedBox(height: 15),
+
+                          Text(
+                            _statusMessage(application.status),
+                            style: const TextStyle(
+                              color: Colors.grey,
+                              fontSize: 15,
+                            ),
+                          ),
+
+                          const SizedBox(height: 20),
+
+                          const Text(
+                            'About the Pet',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+
+                          const SizedBox(height: 8),
+
+                          Text(
+                            application.pet.description,
+                            style: const TextStyle(
+                              color: Colors.grey,
+                            ),
+                          ),
+
+                          const SizedBox(height: 25),
+
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: () {
+                                Navigator.pop(context);
+                              },
+                              child: const Text('Close'),
+                            ),
+                          ),
+
+                          const SizedBox(height: 10),
+                        ],
                       ),
+                    );
+                  },
+                );
+              },
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 28,
+                          backgroundColor: Colors.teal.shade100,
+                          child: Icon(
+                            application.pet.icon,
+                            size: 30,
+                            color: Colors.teal,
+                          ),
+                        ),
 
-                      _statusBadge(application.status),
-                    ],
-                  ),
+                        const SizedBox(width: 15),
 
-                  const SizedBox(height: 15),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                application.pet.name,
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Text(
+                                '${application.pet.type} • ${application.pet.age}',
+                                style: const TextStyle(
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
 
-                  const Divider(),
-
-                  const SizedBox(height: 10),
-
-                  const Text(
-                    'Application Status',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
+                        _statusBadge(application.status),
+                      ],
                     ),
-                  ),
 
-                  const SizedBox(height: 5),
+                    const SizedBox(height: 15),
 
-                  Text(
-                    _statusMessage(application.status),
-                    style: const TextStyle(
-                      color: Colors.grey,
+                    const Divider(),
+
+                    const SizedBox(height: 10),
+
+                    const Text(
+                      'Application Status',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                ],
+
+                    const SizedBox(height: 5),
+
+                    Text(
+                      _statusMessage(application.status),
+                      style: const TextStyle(
+                        color: Colors.grey,
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Text(
+                          'View Details',
+                          style: TextStyle(
+                            color: Colors.teal,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        const Icon(
+                          Icons.arrow_forward_ios,
+                          size: 15,
+                          color: Colors.teal,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           );
