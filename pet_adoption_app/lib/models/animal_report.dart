@@ -7,6 +7,8 @@ class AnimalReport {
   final String? imagePath;
   final DateTime date;
   String status;
+  final double? latitude;
+  final double? longitude;
 
   AnimalReport({
     required this.id,
@@ -17,5 +19,7 @@ class AnimalReport {
     this.imagePath,
     required this.date,
     this.status = 'Pending',
+    this.latitude,
+    this.longitude,
   });
 }

@@ -1,8 +1,10 @@
+
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import '../models/animal_report.dart';
 
 class ReportAnimalPage extends StatefulWidget {
-  final Function(AnimalReport) onReportSubmitted;
+  final Future<void> Function(AnimalReport) onReportSubmitted;
 
   const ReportAnimalPage({
     super.key,
@@ -36,6 +38,10 @@ class _ReportAnimalPageState extends State<ReportAnimalPage> {
   ];
 
   bool isSubmitting = false;
+  bool isGettingLocation = false;
+
+  double? reportLatitude;
+  double? reportLongitude;
 
   @override
   void dispose() {
@@ -44,12 +50,82 @@ class _ReportAnimalPageState extends State<ReportAnimalPage> {
     super.dispose();
   }
 
+  // GET CURRENT GPS LOCATION
+  Future<void> getReportLocation() async {
+    setState(() {
+      isGettingLocation = true;
+    });
+
+    try {
+      bool enabled = await Geolocator.isLocationServiceEnabled();
+
+      if (!enabled) {
+        throw Exception('Please enable location services');
+      }
+
+      LocationPermission permission =
+          await Geolocator.checkPermission();
+
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        throw Exception('Location permission denied');
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        reportLatitude = position.latitude;
+        reportLongitude = position.longitude;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('GPS location captured successfully'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not get location: $e'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          isGettingLocation = false;
+        });
+      }
+    }
+  }
+
+  // SUBMIT ANIMAL REPORT
   Future<void> _submitReport() async {
     if (locationController.text.trim().isEmpty ||
         descriptionController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please fill all required fields'),
+        ),
+      );
+      return;
+    }
+
+    if (reportLatitude == null || reportLongitude == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please capture the rescue location first'),
         ),
       );
       return;
@@ -69,37 +145,36 @@ class _ReportAnimalPageState extends State<ReportAnimalPage> {
         imagePath: null,
         date: DateTime.now(),
         status: 'Pending',
+        latitude: reportLatitude,
+        longitude: reportLongitude,
       );
 
-      // Send report to main.dart
-      // main.dart will save it to Firestore.
+      // Send report to main.dart for Firestore saving
       await widget.onReportSubmitted(report);
 
       if (!mounted) return;
-
-      setState(() {
-        isSubmitting = false;
-      });
-
-      Navigator.pop(context);
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Animal report submitted successfully'),
         ),
       );
+
+      Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
-
-      setState(() {
-        isSubmitting = false;
-      });
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Failed to submit report: $e'),
         ),
       );
+    } finally {
+      if (mounted) {
+        setState(() {
+          isSubmitting = false;
+        });
+      }
     }
   }
 
@@ -110,13 +185,11 @@ class _ReportAnimalPageState extends State<ReportAnimalPage> {
         title: const Text('Report an Animal'),
         centerTitle: true,
       ),
-
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-
             // TITLE
             const Text(
               'Report an Animal',
@@ -232,6 +305,43 @@ class _ReportAnimalPageState extends State<ReportAnimalPage> {
               ),
             ),
 
+            const SizedBox(height: 10),
+
+            // GPS LOCATION BUTTON
+            OutlinedButton.icon(
+              onPressed: isGettingLocation
+                  ? null
+                  : getReportLocation,
+              icon: isGettingLocation
+                  ? const SizedBox(
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Icon(Icons.my_location),
+              label: Text(
+                isGettingLocation
+                    ? 'Getting Location...'
+                    : 'Use Current GPS Location',
+              ),
+            ),
+
+            if (reportLatitude != null &&
+                reportLongitude != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  'GPS: ${reportLatitude!.toStringAsFixed(5)}, '
+                  '${reportLongitude!.toStringAsFixed(5)}',
+                  style: const TextStyle(
+                    color: Colors.green,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+
             const SizedBox(height: 20),
 
             // DESCRIPTION
@@ -267,7 +377,9 @@ class _ReportAnimalPageState extends State<ReportAnimalPage> {
               width: double.infinity,
               height: 55,
               child: ElevatedButton(
-                onPressed: isSubmitting ? null : _submitReport,
+                onPressed: isSubmitting || isGettingLocation
+                    ? null
+                    : _submitReport,
                 style: ElevatedButton.styleFrom(
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -275,19 +387,19 @@ class _ReportAnimalPageState extends State<ReportAnimalPage> {
                 ),
                 child: isSubmitting
                     ? const SizedBox(
-                  height: 24,
-                  width: 24,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                  ),
-                )
+                        height: 24,
+                        width: 24,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                        ),
+                      )
                     : const Text(
-                  'Submit Report',
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                        'Submit Report',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
               ),
             ),
           ],

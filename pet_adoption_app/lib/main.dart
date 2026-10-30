@@ -3,6 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+
+import 'report/rescue_map_page.dart';
 import 'firebase_options.dart';
 import 'models/animal_report.dart';
 import 'report/report_animal_page.dart';
@@ -211,6 +213,7 @@ class AdminDashboard extends StatelessWidget {
                 },
               ),
             ),
+            
 
             const SizedBox(height: 15),
 
@@ -246,6 +249,24 @@ class AdminDashboard extends StatelessWidget {
             ),
 
             const SizedBox(height: 15),
+
+            // RESCUE MAP
+          Card(
+            child: ListTile(
+            leading: const Icon(Icons.map, color: Colors.teal),
+            title: const Text("Live Rescue Map"),
+            subtitle: const Text("View reported animals on map"),
+            trailing: const Icon(Icons.arrow_forward_ios),
+            onTap: () {
+              Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const RescueMapPage(),
+              ),
+              );
+            },
+            ),
+          ),
 
             // PETS
                        // PETS
@@ -1085,31 +1106,37 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       print('Error loading animal reports: $e');
     }
   }
-  Future<void> saveAnimalReport(AnimalReport report) async {
-    try {
-      await FirebaseFirestore.instance
-          .collection('animalReports')
-          .doc(report.id)
-          .set({
-        'animalType': report.animalType,
-        'location': report.location,
-        'condition': report.condition,
-        'description': report.description,
-        'imagePath': null,
-        'date': Timestamp.fromDate(report.date),
-        'status': report.status,
-      });
+  
+Future<void> saveAnimalReport(AnimalReport report) async {
+  try {
+    await FirebaseFirestore.instance
+        .collection('animalReports')
+        .doc(report.id)
+        .set({
+      'animalType': report.animalType,
+      'location': report.location,
+      'condition': report.condition,
+      'description': report.description,
+      'imagePath': null,
+      'date': Timestamp.fromDate(report.date),
+      'status': report.status,
 
-      setState(() {
-        animalReports.add(report);
-      });
+      // GPS COORDINATES FOR LIVE RESCUE MAP
+      'latitude': report.latitude,
+      'longitude': report.longitude,
+    });
 
-      print('Animal report saved successfully');
-    } catch (e) {
-      print('Error saving animal report: $e');
-      rethrow;
-    }
+    setState(() {
+      animalReports.add(report);
+    });
+
+    print('Animal report saved successfully');
+  } catch (e) {
+    print('Error saving animal report: $e');
+    rethrow;
   }
+}
+
   List<Pet> pets = [];
 
 
