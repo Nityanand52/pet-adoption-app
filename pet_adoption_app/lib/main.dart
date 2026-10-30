@@ -12,6 +12,7 @@ import 'adoption/my_adoption_page.dart';
 import 'adoption/adoption_form_page.dart';
 import 'admin/adoption_requests_page.dart';
 import 'admin/manage_pets_page.dart';
+import 'report/rescue_map_page.dart';
 
 
 void main() async {
@@ -155,7 +156,7 @@ class AdminDashboard extends StatelessWidget {
         ],
       ),
 
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -206,6 +207,29 @@ class AdminDashboard extends StatelessWidget {
                     MaterialPageRoute(
                       builder: (context) =>
                       const AdminAnimalReportsPage(),
+                    ),
+                  );
+                },
+              ),
+            ),
+
+            const SizedBox(height: 15),
+
+            // LIVE RESCUE MAP
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.map, color: Colors.teal, size: 35),
+                title: const Text(
+                  'Live Rescue Map',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: const Text('View reported animals on the map'),
+                trailing: const Icon(Icons.arrow_forward_ios, size: 18),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const RescueMapPage(),
                     ),
                   );
                 },
