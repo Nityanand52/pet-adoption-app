@@ -487,6 +487,7 @@ class AdminDashboard extends StatelessWidget {
     );
   }
 }
+
 class _AdminStatCard extends StatelessWidget {
   final String title;
   final IconData icon;
@@ -503,7 +504,10 @@ class _AdminStatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(15),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 15,
+        vertical: 10,
+      ),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(19),
@@ -526,7 +530,7 @@ class _AdminStatCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                padding: const EdgeInsets.all(9),
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: color.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(12),
@@ -534,10 +538,9 @@ class _AdminStatCard extends StatelessWidget {
                 child: Icon(
                   icon,
                   color: color,
-                  size: 22,
+                  size: 21,
                 ),
               ),
-
               Icon(
                 Icons.trending_up_rounded,
                 color: color.withOpacity(0.7),
@@ -545,12 +548,12 @@ class _AdminStatCard extends StatelessWidget {
               ),
             ],
           ),
-
           StreamBuilder<int>(
             stream: stream,
             builder: (context, snapshot) {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     snapshot.hasError
@@ -559,18 +562,18 @@ class _AdminStatCard extends StatelessWidget {
                             ? '${snapshot.data}'
                             : '...',
                     style: const TextStyle(
-                      fontSize: 25,
+                      fontSize: 24,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFF193B33),
                     ),
                   ),
-
+                  const SizedBox(height: 2),
                   Text(
                     title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontSize: 12,
+                      fontSize: 11,
                       color: Colors.grey,
                       fontWeight: FontWeight.w500,
                     ),
@@ -584,6 +587,7 @@ class _AdminStatCard extends StatelessWidget {
     );
   }
 }
+
 
 
 class _AdminActionCard extends StatelessWidget {
