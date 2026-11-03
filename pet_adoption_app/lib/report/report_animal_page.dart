@@ -1,8 +1,13 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:http/http.dart' as http;
+
 import '../models/animal_report.dart';
 
 class ReportAnimalPage extends StatefulWidget {
-  final Function(AnimalReport) onReportSubmitted;
+  final Future<void> Function(AnimalReport report) onReportSubmitted;
 
   const ReportAnimalPage({
     super.key,
@@ -14,44 +19,106 @@ class ReportAnimalPage extends StatefulWidget {
 }
 
 class _ReportAnimalPageState extends State<ReportAnimalPage> {
-  final locationController = TextEditingController();
-  final descriptionController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
 
-  String selectedAnimal = 'Dog';
-  String selectedCondition = 'Injured';
+  final TextEditingController locationController = TextEditingController();
+  final TextEditingController descriptionController =
+      TextEditingController();
+
+  final ImagePicker _picker = ImagePicker();
+
+  String? selectedAnimal;
+  String? selectedCondition;
+
+  XFile? selectedImage;
+
+  bool isSubmitting = false;
 
   final List<String> animalTypes = [
     'Dog',
     'Cat',
+    'Cow',
+    'Buffalo',
+    'Goat',
+    'Horse',
     'Bird',
     'Other',
   ];
 
   final List<String> conditions = [
+    'Healthy',
     'Injured',
-    'Abandoned',
-    'Lost',
     'Sick',
-    'Other',
+    'Abandoned',
+    'Critical',
   ];
 
-  bool isSubmitting = false;
+  // Cloudinary configuration
+  final String cloudName = 'zmogwtwg';
+  final String uploadPreset = 'pet_adoption_uploads';
 
-  @override
-  void dispose() {
-    locationController.dispose();
-    descriptionController.dispose();
-    super.dispose();
+  Future<void> pickImage() async {
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 80,
+      );
+
+      if (image != null) {
+        setState(() {
+          selectedImage = image;
+        });
+      }
+    } catch (e) {
+      showMessage('Unable to select image');
+    }
   }
 
-  Future<void> _submitReport() async {
-    if (locationController.text.trim().isEmpty ||
-        descriptionController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please fill all required fields'),
+  Future<String?> uploadImageToCloudinary() async {
+    if (selectedImage == null) {
+      return null;
+    }
+
+    try {
+      final uri = Uri.parse(
+        'https://api.cloudinary.com/v1_1/$cloudName/image/upload',
+      );
+
+      final request = http.MultipartRequest('POST', uri);
+
+      request.fields['upload_preset'] = uploadPreset;
+
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          'file',
+          selectedImage!.path,
         ),
       );
+
+      final response = await request.send();
+
+      final responseData = await response.stream.bytesToString();
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(responseData);
+        return data['secure_url'];
+      } else {
+        debugPrint('Cloudinary error: $responseData');
+        throw Exception('Image upload failed');
+      }
+    } catch (e) {
+      debugPrint('Image upload error: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> submitReport() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    if (selectedAnimal == null || selectedCondition == null) {
+      showMessage('Please select animal type and condition');
       return;
     }
 
@@ -60,47 +127,58 @@ class _ReportAnimalPageState extends State<ReportAnimalPage> {
     });
 
     try {
+      // Upload image first
+      final String? imageUrl = await uploadImageToCloudinary();
+
+      // Create report object
       final report = AnimalReport(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
-        animalType: selectedAnimal,
+        animalType: selectedAnimal!,
         location: locationController.text.trim(),
-        condition: selectedCondition,
+        condition: selectedCondition!,
         description: descriptionController.text.trim(),
-        imagePath: null,
+        imagePath: imageUrl,
         date: DateTime.now(),
         status: 'Pending',
       );
 
-      // Send report to main.dart
-      // main.dart will save it to Firestore.
+      // Save using the callback in main.dart
       await widget.onReportSubmitted(report);
 
       if (!mounted) return;
 
-      setState(() {
-        isSubmitting = false;
-      });
+      showMessage('Animal report submitted successfully!');
 
       Navigator.pop(context);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Animal report submitted successfully'),
-        ),
-      );
     } catch (e) {
-      if (!mounted) return;
+      debugPrint('Report submission error: $e');
 
-      setState(() {
-        isSubmitting = false;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to submit report: $e'),
-        ),
-      );
+      if (mounted) {
+        showMessage('Failed to submit report. Please try again.');
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          isSubmitting = false;
+        });
+      }
     }
+  }
+
+  void showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    locationController.dispose();
+    descriptionController.dispose();
+    super.dispose();
   }
 
   @override
@@ -108,189 +186,265 @@ class _ReportAnimalPageState extends State<ReportAnimalPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Report an Animal'),
-        centerTitle: true,
+        backgroundColor: Colors.teal,
+        foregroundColor: Colors.white,
       ),
 
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
 
-            // TITLE
-            const Text(
-              'Report an Animal',
-              style: TextStyle(
-                fontSize: 26,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+        child: Form(
+          key: _formKey,
 
-            const SizedBox(height: 8),
-
-            const Text(
-              'Help us know about an animal that needs attention.',
-              style: TextStyle(
-                color: Colors.grey,
-                fontSize: 15,
-              ),
-            ),
-
-            const SizedBox(height: 25),
-
-            // ANIMAL TYPE
-            const Text(
-              'Animal Type',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-
-            const SizedBox(height: 8),
-
-            DropdownButtonFormField<String>(
-              value: selectedAnimal,
-              decoration: InputDecoration(
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Help an animal in need',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
                 ),
-                prefixIcon: const Icon(Icons.pets),
               ),
-              items: animalTypes.map((animal) {
-                return DropdownMenuItem(
-                  value: animal,
-                  child: Text(animal),
-                );
-              }).toList(),
-              onChanged: (value) {
-                if (value != null) {
+
+              const SizedBox(height: 8),
+
+              const Text(
+                'Provide the animal details so our team can help.',
+                style: TextStyle(color: Colors.grey),
+              ),
+
+              const SizedBox(height: 25),
+
+              // Animal type
+              const Text(
+                'Animal Type',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+
+              const SizedBox(height: 8),
+
+              DropdownButtonFormField<String>(
+                value: selectedAnimal,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  hintText: 'Select animal type',
+                ),
+                items: animalTypes.map((animal) {
+                  return DropdownMenuItem(
+                    value: animal,
+                    child: Text(animal),
+                  );
+                }).toList(),
+                onChanged: (value) {
                   setState(() {
                     selectedAnimal = value;
                   });
-                }
-              },
-            ),
-
-            const SizedBox(height: 20),
-
-            // CONDITION
-            const Text(
-              'Condition',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
+                },
+                validator: (value) {
+                  if (value == null) {
+                    return 'Please select animal type';
+                  }
+                  return null;
+                },
               ),
-            ),
 
-            const SizedBox(height: 8),
+              const SizedBox(height: 20),
 
-            DropdownButtonFormField<String>(
-              value: selectedCondition,
-              decoration: InputDecoration(
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+              // Location
+              const Text(
+                'Location',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+
+              const SizedBox(height: 8),
+
+              TextFormField(
+                controller: locationController,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  hintText: 'Enter animal location',
+                  prefixIcon: Icon(Icons.location_on),
                 ),
-                prefixIcon: const Icon(Icons.health_and_safety),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Please enter location';
+                  }
+                  return null;
+                },
               ),
-              items: conditions.map((condition) {
-                return DropdownMenuItem(
-                  value: condition,
-                  child: Text(condition),
-                );
-              }).toList(),
-              onChanged: (value) {
-                if (value != null) {
+
+              const SizedBox(height: 20),
+
+              // Condition
+              const Text(
+                'Animal Condition',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+
+              const SizedBox(height: 8),
+
+              DropdownButtonFormField<String>(
+                value: selectedCondition,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  hintText: 'Select animal condition',
+                ),
+                items: conditions.map((condition) {
+                  return DropdownMenuItem(
+                    value: condition,
+                    child: Text(condition),
+                  );
+                }).toList(),
+                onChanged: (value) {
                   setState(() {
                     selectedCondition = value;
                   });
-                }
-              },
-            ),
-
-            const SizedBox(height: 20),
-
-            // LOCATION
-            const Text(
-              'Location',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
+                },
+                validator: (value) {
+                  if (value == null) {
+                    return 'Please select condition';
+                  }
+                  return null;
+                },
               ),
-            ),
 
-            const SizedBox(height: 8),
+              const SizedBox(height: 20),
 
-            TextField(
-              controller: locationController,
-              decoration: InputDecoration(
-                hintText: 'Enter where you found the animal',
-                prefixIcon: const Icon(Icons.location_on),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+              // Description
+              const Text(
+                'Description',
+                style: TextStyle(fontWeight: FontWeight.bold),
               ),
-            ),
 
-            const SizedBox(height: 20),
+              const SizedBox(height: 8),
 
-            // DESCRIPTION
-            const Text(
-              'Description',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
+              TextFormField(
+                controller: descriptionController,
+                maxLines: 4,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  hintText: 'Describe the animal and situation...',
+                  alignLabelWithHint: true,
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Please enter description';
+                  }
+                  return null;
+                },
               ),
-            ),
 
-            const SizedBox(height: 8),
+              const SizedBox(height: 20),
 
-            TextField(
-              controller: descriptionController,
-              maxLines: 5,
-              decoration: InputDecoration(
-                hintText: 'Describe the animal and what happened...',
-                prefixIcon: const Padding(
-                  padding: EdgeInsets.only(bottom: 80),
-                  child: Icon(Icons.description),
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+              // Image upload
+              const Text(
+                'Animal Photo',
+                style: TextStyle(fontWeight: FontWeight.bold),
               ),
-            ),
 
-            const SizedBox(height: 30),
+              const SizedBox(height: 10),
 
-            // SUBMIT BUTTON
-            SizedBox(
-              width: double.infinity,
-              height: 55,
-              child: ElevatedButton(
-                onPressed: isSubmitting ? null : _submitReport,
-                style: ElevatedButton.styleFrom(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: isSubmitting
-                    ? const SizedBox(
-                  height: 24,
-                  width: 24,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                  ),
+              if (selectedImage != null)
+                Column(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.network(
+                        selectedImage!.path,
+                        height: 180,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            height: 180,
+                            color: Colors.grey.shade200,
+                            child: const Center(
+                              child: Icon(Icons.image, size: 50),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+
+                    TextButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          selectedImage = null;
+                        });
+                      },
+                      icon: const Icon(Icons.delete, color: Colors.red),
+                      label: const Text(
+                        'Remove Photo',
+                        style: TextStyle(color: Colors.red),
+                      ),
+                    ),
+                  ],
                 )
-                    : const Text(
-                  'Submit Report',
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.bold,
+              else
+                InkWell(
+                  onTap: pickImage,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(25),
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: Colors.grey.shade400,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Column(
+                      children: [
+                        Icon(
+                          Icons.add_a_photo,
+                          size: 40,
+                          color: Colors.teal,
+                        ),
+                        SizedBox(height: 10),
+                        Text('Upload Animal Photo'),
+                        SizedBox(height: 5),
+                        Text(
+                          'Choose an image from gallery',
+                          style: TextStyle(
+                            color: Colors.grey,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
+
+              const SizedBox(height: 30),
+
+              // Submit button
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: isSubmitting ? null : submitReport,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.teal,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: isSubmitting
+                      ? const CircularProgressIndicator(
+                          color: Colors.white,
+                        )
+                      : const Text(
+                          'Submit Report',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

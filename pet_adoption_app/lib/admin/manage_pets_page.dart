@@ -1,4 +1,3 @@
-
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -44,27 +43,44 @@ class ManagePetsPage extends StatelessWidget {
     String? petId,
     Map<String, dynamic>? pet,
   }) async {
-    final name = TextEditingController(
-      text: pet?['name']?.toString() ?? '',
-    );
-    final type = TextEditingController(
-      text: pet?['type']?.toString() ?? '',
-    );
-    final age = TextEditingController(
-      text: pet?['age']?.toString() ?? '',
-    );
+    final name = TextEditingController(text: pet?['name']?.toString() ?? '');
+    final breed = TextEditingController(text: pet?['breed']?.toString() ?? '');
+    final age = TextEditingController(text: pet?['age']?.toString() ?? '');
     final description = TextEditingController(
       text: pet?['description']?.toString() ?? '',
     );
-    final price = TextEditingController(
-      text: pet?['price']?.toString() ?? '',
+    final fee = TextEditingController(
+      text: (pet?['adoptionFee'] ?? pet?['price'])?.toString() ?? '0',
     );
-    final gender = TextEditingController(
-      text: pet?['gender']?.toString() ?? '',
+    final location = TextEditingController(
+      text: pet?['location']?.toString() ?? '',
     );
-    final health = TextEditingController(
-      text: pet?['healthStatus']?.toString() ?? '',
-    );
+
+    const animalTypes = [
+      'Dog', 'Cat', 'Rabbit', 'Bird', 'Hamster',
+      'Guinea Pig', 'Turtle', 'Fish',
+    ];
+    const genders = ['Male', 'Female', 'Unknown'];
+    const healthStatuses = [
+      'Healthy', 'Under Treatment', 'Recovering', 'Special Needs', 'Unknown',
+    ];
+    const sterilizationOptions = ['Yes', 'No', 'Unknown'];
+
+    String type = animalTypes.contains(pet?['type'])
+        ? pet!['type'] as String
+        : 'Dog';
+    String ageUnit = pet?['ageUnit']?.toString() == 'Years'
+        ? 'Years'
+        : 'Months';
+    String gender = genders.contains(pet?['gender'])
+        ? pet!['gender'] as String
+        : 'Unknown';
+    String health = healthStatuses.contains(pet?['healthStatus'])
+        ? pet!['healthStatus'] as String
+        : 'Unknown';
+    String sterilized = sterilizationOptions.contains(pet?['sterilized'])
+        ? pet!['sterilized'] as String
+        : 'Unknown';
 
     bool vaccinated = pet?['isVaccinated'] == true;
     bool saving = false;
@@ -75,6 +91,7 @@ class ManagePetsPage extends StatelessWidget {
     try {
       await showDialog<void>(
         context: context,
+        barrierDismissible: false,
         builder: (dialogContext) => StatefulBuilder(
           builder: (dialogContext, setDialogState) {
             Future<void> chooseImage() async {
@@ -84,11 +101,8 @@ class ManagePetsPage extends StatelessWidget {
                   imageQuality: 80,
                   maxWidth: 1200,
                 );
-
                 if (picked != null && dialogContext.mounted) {
-                  setDialogState(() {
-                    selectedImage = picked;
-                  });
+                  setDialogState(() => selectedImage = picked);
                 }
               } catch (e) {
                 if (!dialogContext.mounted) return;
@@ -98,86 +112,164 @@ class ManagePetsPage extends StatelessWidget {
               }
             }
 
-            Widget field(
-              TextEditingController controller,
-              String label, {
-              bool numeric = false,
-              bool multiline = false,
-            }) {
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: TextFormField(
-                  controller: controller,
-                  keyboardType: numeric
-                      ? TextInputType.number
-                      : multiline
-                          ? TextInputType.multiline
-                          : TextInputType.text,
-                  maxLines: multiline ? 3 : 1,
-                  decoration: InputDecoration(
-                    labelText: label,
-                    border: const OutlineInputBorder(),
+            InputDecoration decoration(String label, {String? hint}) =>
+                InputDecoration(
+                  labelText: label,
+                  hintText: hint,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Enter $label';
-                    }
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.grey.shade400),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 14,
+                  ),
+                );
 
-                    if (numeric) {
-                      final number = double.tryParse(value.trim());
-                      if (number == null || number < 0) {
-                        return 'Enter a valid price';
-                      }
-                    }
-
-                    return null;
-                  },
+            Widget sectionTitle(String number, String title, String subtitle) {
+              return Padding(
+                padding: const EdgeInsets.only(top: 8, bottom: 14),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 16,
+                      backgroundColor: Theme.of(context)
+                          .colorScheme.primaryContainer,
+                      child: Text(
+                        number,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onPrimaryContainer,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(title,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w700, fontSize: 16)),
+                          Text(subtitle,
+                              style: TextStyle(
+                                  color: Colors.grey.shade600, fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               );
             }
 
+            Widget dropdown<T>({
+              required String label,
+              required T value,
+              required List<T> items,
+              required ValueChanged<T?> onChanged,
+            }) {
+              return DropdownButtonFormField<T>(
+                value: value,
+                isExpanded: true,
+                decoration: decoration(label),
+                items: items
+                    .map((item) => DropdownMenuItem<T>(
+                          value: item,
+                          child: Text(item.toString()),
+                        ))
+                    .toList(),
+                onChanged: saving ? null : onChanged,
+              );
+            }
+
+            Widget textField(
+              TextEditingController controller,
+              String label, {
+              String? hint,
+              int maxLines = 1,
+              TextInputType keyboardType = TextInputType.text,
+              String? Function(String?)? validator,
+            }) {
+              return TextFormField(
+                controller: controller,
+                maxLines: maxLines,
+                keyboardType: keyboardType,
+                decoration: decoration(label, hint: hint),
+                validator: validator ??
+                    (value) => value == null || value.trim().isEmpty
+                        ? 'Please enter $label'
+                        : null,
+              );
+            }
+
             return AlertDialog(
-              title: Text(petId == null ? 'Add Pet' : 'Edit Pet'),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(22)),
+              titlePadding: const EdgeInsets.fromLTRB(22, 22, 22, 8),
+              contentPadding: const EdgeInsets.fromLTRB(22, 8, 22, 8),
+              actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              title: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(petId == null ? 'Add New Pet' : 'Edit Pet',
+                            style: const TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 21)),
+                        const SizedBox(height: 4),
+                        Text('Create an adoption listing',
+                            style: TextStyle(
+                                color: Colors.grey.shade600, fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.pets,
+                      color: Theme.of(context).colorScheme.primary, size: 28),
+                ],
+              ),
               content: SizedBox(
-                width: 420,
+                width: 460,
                 child: SingleChildScrollView(
                   child: Form(
                     key: formKey,
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        sectionTitle('1', 'Basic information',
+                            'Tell adopters about this animal'),
                         if (selectedImage != null)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: FutureBuilder<List<int>>(
-                              future: selectedImage!.readAsBytes(),
-                              builder: (context, snapshot) {
-                                if (!snapshot.hasData) {
-                                  return const SizedBox(
-                                    height: 120,
-                                    child: Center(
-                                      child: CircularProgressIndicator(),
-                                    ),
-                                  );
-                                }
-
-                                return Image.memory(
-                                  // XFile returns Uint8List.
-                                   Uint8List.fromList(snapshot.data!),
-                                  height: 160,
+                          FutureBuilder<Uint8List>(
+                            future: selectedImage!.readAsBytes(),
+                            builder: (context, snapshot) {
+                              if (!snapshot.hasData) {
+                                return const SizedBox(
+                                  height: 150,
+                                  child: Center(
+                                      child: CircularProgressIndicator()),
+                                );
+                              }
+                              return ClipRRect(
+                                borderRadius: BorderRadius.circular(14),
+                                child: Image.memory(
+                                  snapshot.data!,
+                                  height: 165,
                                   width: double.infinity,
                                   fit: BoxFit.cover,
-                                );
-                              },
-                            ),
+                                ),
+                              );
+                            },
                           )
-                        else if (imageUrl != null &&
-                            imageUrl!.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
+                        else if (imageUrl != null && imageUrl!.isNotEmpty)
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(14),
                             child: Image.network(
                               imageUrl!,
-                              height: 160,
+                              height: 165,
                               width: double.infinity,
                               fit: BoxFit.cover,
                               errorBuilder: (_, __, ___) =>
@@ -185,41 +277,148 @@ class ManagePetsPage extends StatelessWidget {
                             ),
                           )
                         else
-                          const Padding(
-                            padding: EdgeInsets.only(bottom: 12),
-                            child: Icon(Icons.pets, size: 70),
+                          Container(
+                            height: 115,
+                            decoration: BoxDecoration(
+                              color: Theme.of(context)
+                                  .colorScheme.surfaceContainerHighest,
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: const Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.add_a_photo_outlined, size: 30),
+                                SizedBox(height: 6),
+                                Text('Add a clear pet photo'),
+                              ],
+                            ),
                           ),
+                        const SizedBox(height: 9),
                         OutlinedButton.icon(
                           onPressed: saving ? null : chooseImage,
-                          icon: const Icon(Icons.add_photo_alternate),
-                          label: Text(
-                            imageUrl != null || selectedImage != null
-                                ? 'Change Pet Image'
-                                : 'Choose Pet Image',
-                          ),
+                          icon: const Icon(Icons.photo_library_outlined),
+                          label: Text(selectedImage != null || imageUrl != null
+                              ? 'Change photo'
+                              : 'Choose pet photo'),
                         ),
-                        const SizedBox(height: 16),
-                        field(name, 'Pet Name'),
-                        field(type, 'Type (Dog/Cat)'),
-                        field(age, 'Age (e.g. 2 years)'),
-                        field(
-                          description,
-                          'Description',
-                          multiline: true,
+                        const SizedBox(height: 12),
+                        textField(name, 'Pet name', hint: 'e.g. Coco'),
+                        const SizedBox(height: 12),
+                        dropdown<String>(
+                          label: 'Animal type',
+                          value: type,
+                          items: animalTypes,
+                          onChanged: (value) =>
+                              setDialogState(() => type = value!),
                         ),
-                        field(price, 'Price', numeric: true),
-                        field(gender, 'Gender'),
-                        field(health, 'Health Status'),
+                        const SizedBox(height: 12),
+                        textField(breed, 'Breed',
+                            hint: 'e.g. Holland Lop'),
+                        const SizedBox(height: 12),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              flex: 2,
+                              child: textField(
+                                age,
+                                'Age',
+                                hint: 'e.g. 6',
+                                keyboardType: TextInputType.number,
+                                validator: (value) {
+                                  final n = int.tryParse(value?.trim() ?? '');
+                                  if (n == null || n < 0) {
+                                    return 'Enter a valid age';
+                                  }
+                                  return null;
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              flex: 3,
+                              child: dropdown<String>(
+                                label: 'Age unit',
+                                value: ageUnit,
+                                items: const ['Months', 'Years'],
+                                onChanged: (value) =>
+                                    setDialogState(() => ageUnit = value!),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        dropdown<String>(
+                          label: 'Gender',
+                          value: gender,
+                          items: genders,
+                          onChanged: (value) =>
+                              setDialogState(() => gender = value!),
+                        ),
+                        const SizedBox(height: 20),
+                        sectionTitle('2', 'Health information',
+                            'Share the pet’s current health details'),
+                        dropdown<String>(
+                          label: 'Health status',
+                          value: health,
+                          items: healthStatuses,
+                          onChanged: (value) =>
+                              setDialogState(() => health = value!),
+                        ),
+                        const SizedBox(height: 4),
                         SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
                           title: const Text('Vaccinated'),
+                          subtitle: const Text('Has received vaccinations'),
                           value: vaccinated,
                           onChanged: saving
                               ? null
-                              : (value) {
-                                  setDialogState(() {
-                                    vaccinated = value;
-                                  });
-                                },
+                              : (value) =>
+                                  setDialogState(() => vaccinated = value),
+                        ),
+                        dropdown<String>(
+                          label: 'Sterilized (neutered / spayed)',
+                          value: sterilized,
+                          items: sterilizationOptions,
+                          onChanged: (value) =>
+                              setDialogState(() => sterilized = value!),
+                        ),
+                        const SizedBox(height: 20),
+                        sectionTitle('3', 'Adoption details',
+                            'Set the adoption fee and listing information'),
+                        textField(
+                          fee,
+                          'Adoption fee (₹)',
+                          hint: 'Enter 0 for free adoption',
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
+                          validator: (value) {
+                            final n = double.tryParse(value?.trim() ?? '');
+                            if (n == null || n < 0) {
+                              return 'Enter a valid fee (0 or more)';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        textField(
+                          location,
+                          'Location',
+                          hint: 'e.g. Delhi, India',
+                        ),
+                        const SizedBox(height: 12),
+                        textField(
+                          description,
+                          'Description',
+                          hint:
+                              'Describe the pet’s personality, habits and special care needs...',
+                          maxLines: 4,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Tip: Enter accurate health and vaccination details. Do not mark a pet vaccinated unless the records are confirmed.',
+                          style: TextStyle(
+                              color: Colors.grey.shade600, fontSize: 11),
                         ),
                       ],
                     ),
@@ -228,42 +427,50 @@ class ManagePetsPage extends StatelessWidget {
               ),
               actions: [
                 TextButton(
-                  onPressed: saving
-                      ? null
-                      : () => Navigator.pop(dialogContext),
+                  onPressed:
+                      saving ? null : () => Navigator.pop(dialogContext),
                   child: const Text('Cancel'),
                 ),
-                ElevatedButton(
+                FilledButton.icon(
                   onPressed: saving
                       ? null
                       : () async {
                           if (!formKey.currentState!.validate()) return;
-
                           setDialogState(() => saving = true);
-
                           try {
                             if (selectedImage != null) {
                               imageUrl =
                                   await uploadPetImage(selectedImage!);
-
                               if (imageUrl == null) {
                                 throw Exception(
-                                  'Cloudinary did not return an image URL',
-                                );
+                                    'Cloudinary did not return an image URL');
                               }
                             }
 
+                            final ageValue = int.parse(age.text.trim());
+                            final adoptionFee =
+                                double.parse(fee.text.trim());
+
                             final data = <String, dynamic>{
                               'name': name.text.trim(),
-                              'type': type.text.trim(),
-                              'age': age.text.trim(),
+                              'type': type,
+                              'breed': breed.text.trim(),
+                              'age': ageValue,
+                              'ageUnit': ageUnit,
                               'description': description.text.trim(),
-                              'price':
-                                  double.parse(price.text.trim()),
-                              'gender': gender.text.trim(),
-                              'healthStatus': health.text.trim(),
+                              'price': adoptionFee, // Keeps older screens compatible.
+                              'adoptionFee': adoptionFee,
+                              'currency': 'INR',
+                              'gender': gender,
+                              'healthStatus': health,
                               'isVaccinated': vaccinated,
+                              'sterilized': sterilized,
+                              'location': location.text.trim(),
+                              'adoptionStatus': 'Available',
+                              'updatedAt': FieldValue.serverTimestamp(),
                               if (imageUrl != null) 'imageUrl': imageUrl,
+                              if (petId == null)
+                                'createdAt': FieldValue.serverTimestamp(),
                             };
 
                             if (petId == null) {
@@ -274,28 +481,27 @@ class ManagePetsPage extends StatelessWidget {
 
                             if (!dialogContext.mounted) return;
                             Navigator.pop(dialogContext);
-
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                  content:
-                                      Text('Pet saved successfully'),
-                                ),
+                                    content: Text('Pet saved successfully')),
                               );
                             }
                           } catch (e) {
                             if (!dialogContext.mounted) return;
-
                             setDialogState(() => saving = false);
-                            ScaffoldMessenger.of(dialogContext)
-                                .showSnackBar(
-                              SnackBar(
-                                content: Text('Save failed: $e'),
-                              ),
+                            ScaffoldMessenger.of(dialogContext).showSnackBar(
+                              SnackBar(content: Text('Save failed: $e')),
                             );
                           }
                         },
-                  child: Text(saving ? 'Saving...' : 'Save'),
+                  icon: saving
+                      ? const SizedBox(
+                          height: 16,
+                          width: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.save_outlined),
+                  label: Text(saving ? 'Saving...' : 'Save Pet'),
                 ),
               ],
             );
@@ -304,26 +510,20 @@ class ManagePetsPage extends StatelessWidget {
       );
     } finally {
       name.dispose();
-      type.dispose();
+      breed.dispose();
       age.dispose();
       description.dispose();
-      price.dispose();
-      gender.dispose();
-      health.dispose();
+      fee.dispose();
+      location.dispose();
     }
   }
 
-  Future<void> deletePet(
-    BuildContext context,
-    String id,
-  ) async {
+  Future<void> deletePet(BuildContext context, String id) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Delete Pet?'),
-        content: const Text(
-          'Are you sure you want to delete this pet?',
-        ),
+        content: const Text('Are you sure you want to delete this pet?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
@@ -341,15 +541,12 @@ class ManagePetsPage extends StatelessWidget {
 
     try {
       await pets.doc(id).delete();
-
       if (!context.mounted) return;
-
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Pet deleted')),
       );
     } catch (e) {
       if (!context.mounted) return;
-
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Delete failed: $e')),
       );
@@ -359,9 +556,7 @@ class ManagePetsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Manage Pets'),
-      ),
+      appBar: AppBar(title: const Text('Manage Pets')),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => showPetForm(context),
         icon: const Icon(Icons.add),
@@ -371,23 +566,16 @@ class ManagePetsPage extends StatelessWidget {
         stream: pets.snapshots(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-            return Center(
-              child: Text('Error: ${snapshot.error}'),
-            );
+            return Center(child: Text('Error: ${snapshot.error}'));
           }
-
           if (!snapshot.hasData) {
-            return const Center(
-              child: CircularProgressIndicator(),
-            );
+            return const Center(child: CircularProgressIndicator());
           }
 
           final documents = snapshot.data!.docs;
-
           if (documents.isEmpty) {
             return const Center(
-              child: Text('No pets available. Add your first pet!'),
-            );
+                child: Text('No pets available. Add your first pet!'));
           }
 
           return ListView.builder(
@@ -396,34 +584,34 @@ class ManagePetsPage extends StatelessWidget {
             itemBuilder: (context, index) {
               final doc = documents[index];
               final data = doc.data();
-
-              final imageUrl = data['imageUrl']?.toString();
+              final imageUrl = data['imageUrl']?.toString() ?? '';
+              final fee = data['adoptionFee'] ?? data['price'] ?? 0;
 
               return Card(
+                clipBehavior: Clip.antiAlias,
                 child: ListTile(
+                  contentPadding: const EdgeInsets.all(10),
                   leading: CircleAvatar(
-                    backgroundImage: imageUrl != null &&
-                            imageUrl.isNotEmpty
-                        ? NetworkImage(imageUrl)
-                        : null,
-                    child: imageUrl == null || imageUrl.isEmpty
-                        ? const Icon(Icons.pets)
-                        : null,
+                    radius: 28,
+                    backgroundImage:
+                        imageUrl.isNotEmpty ? NetworkImage(imageUrl) : null,
+                    child: imageUrl.isEmpty ? const Icon(Icons.pets) : null,
                   ),
                   title: Text(
                     data['name']?.toString() ?? 'Unnamed',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
                   subtitle: Text(
-                    '${data['type'] ?? ''} • ${data['age'] ?? ''}\n'
-                    'Price: ${data['price'] ?? 0}',
+                    '${data['type'] ?? ''} • ${data['age'] ?? ''} '
+                    '${data['ageUnit'] ?? ''}\nAdoption fee: ₹$fee',
                   ),
                   isThreeLine: true,
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
+                  trailing: Wrap(
+                    spacing: 0,
                     children: [
                       IconButton(
                         tooltip: 'Edit',
-                        icon: const Icon(Icons.edit),
+                        icon: const Icon(Icons.edit_outlined),
                         onPressed: () => showPetForm(
                           context,
                           petId: doc.id,
@@ -432,12 +620,9 @@ class ManagePetsPage extends StatelessWidget {
                       ),
                       IconButton(
                         tooltip: 'Delete',
-                        icon: const Icon(
-                          Icons.delete,
-                          color: Colors.red,
-                        ),
-                        onPressed: () =>
-                            deletePet(context, doc.id),
+                        icon: const Icon(Icons.delete_outline,
+                            color: Colors.red),
+                        onPressed: () => deletePet(context, doc.id),
                       ),
                     ],
                   ),

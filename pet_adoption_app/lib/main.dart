@@ -13,6 +13,7 @@ import 'adoption/adoption_form_page.dart';
 import 'admin/adoption_requests_page.dart';
 import 'admin/manage_pets_page.dart';
 import 'report/rescue_map_page.dart';
+import 'splash_screen.dart';
 
 
 void main() async {
@@ -35,23 +36,35 @@ class PetAdoptionApp extends StatefulWidget {
 class _PetAdoptionAppState extends State<PetAdoptionApp> {
   bool isLoggedIn = false;
   bool isAdmin = false;
+  bool showSplash = true;
+
   late UserProfile currentUser;
 
   @override
   void initState() {
     super.initState();
+
     currentUser = UserProfile(
       name: '',
       email: '',
       phone: '',
     );
+
+    // Splash screen timer
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) {
+        setState(() {
+          showSplash = false;
+        });
+      }
+    });
   }
 
   Future<void> _login(
-      String email,
-      String password,
-      String name,
-      ) async {
+    String email,
+    String password,
+    String name,
+  ) async {
     try {
       final user = FirebaseAuth.instance.currentUser;
 
@@ -113,22 +126,30 @@ class _PetAdoptionAppState extends State<PetAdoptionApp> {
       debugShowCheckedModeBanner: false,
       title: '🐾 Pet Adoption',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.teal,
+        ),
         useMaterial3: true,
       ),
-      home: !isLoggedIn
-          ? LoginPage(onLogin: _login)
-          : isAdmin
-          ? AdminDashboard(
-        onLogout: _logout,
-      )
-          : HomePage(
-        user: currentUser,
-        onLogout: _logout,
-      ),
+
+      home: showSplash
+    ? const SplashScreen()
+    : !isLoggedIn
+        ? LoginPage(
+            onLogin: _login,
+          )
+        : isAdmin
+            ? AdminDashboard(
+                onLogout: _logout,
+              )
+            : HomePage(
+                user: currentUser,
+                onLogout: _logout,
+              ),
     );
   }
 }
+
 class AdminDashboard extends StatelessWidget {
   final VoidCallback onLogout;
 
@@ -137,177 +158,534 @@ class AdminDashboard extends StatelessWidget {
     required this.onLogout,
   });
 
+  Stream<int> getCount(String collection) {
+    return FirebaseFirestore.instance
+        .collection(collection)
+        .snapshots()
+        .map((snapshot) => snapshot.docs.length);
+  }
+
+  Stream<int> getPendingApplications() {
+    return FirebaseFirestore.instance
+        .collection('adoptionApplications')
+        .where('status', isEqualTo: 'Pending')
+        .snapshots()
+        .map((snapshot) => snapshot.docs.length);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
+      backgroundColor: const Color(0xFFF5F8F6),
+
       appBar: AppBar(
+        backgroundColor: const Color(0xFFF5F8F6),
+        elevation: 0,
         title: const Text(
-          'Admin Dashboard',
+          'Rescue Admin',
           style: TextStyle(
+            fontSize: 22,
             fontWeight: FontWeight.bold,
+            color: Color(0xFF173D35),
           ),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout),
             onPressed: onLogout,
+            icon: const Icon(Icons.logout_rounded),
             tooltip: 'Logout',
           ),
+          const SizedBox(width: 8),
         ],
       ),
 
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(20, 10, 20, 30),
+
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Welcome, Admin 👋',
-              style: TextStyle(
-                fontSize: 26,
-                fontWeight: FontWeight.bold,
+
+            // WELCOME BANNER
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(22),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [
+                    Color(0xFF126B59),
+                    Color(0xFF23977B),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: Stack(
+                children: [
+                  Positioned(
+                    right: -5,
+                    bottom: -15,
+                    child: Icon(
+                      Icons.pets,
+                      size: 125,
+                      color: Colors.white.withOpacity(0.10),
+                    ),
+                  ),
+
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'ADMIN CONTROL CENTER',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
+
+                      const SizedBox(height: 15),
+
+                      const Text(
+                        'Welcome back, Admin! 👋',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 25,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      const Text(
+                        'Every action helps an animal find a safe home.',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 14,
+                          height: 1.4,
+                        ),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 9,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.18),
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.favorite,
+                              color: Colors.white,
+                              size: 16,
+                            ),
+                            SizedBox(width: 7),
+                            Text(
+                              'Making a difference every day',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
 
-            const SizedBox(height: 8),
+            const SizedBox(height: 28),
+
+            // OVERVIEW
+            const Text(
+              'Dashboard Overview',
+              style: TextStyle(
+                fontSize: 21,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF193B33),
+              ),
+            ),
+
+            const SizedBox(height: 5),
 
             const Text(
-              'Manage your Pet Adoption application',
+              'A quick look at your application',
               style: TextStyle(
                 color: Colors.grey,
-                fontSize: 15,
+                fontSize: 13,
               ),
+            ),
+
+            const SizedBox(height: 18),
+
+            // STATISTICS GRID
+            GridView.count(
+              crossAxisCount: 2,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisSpacing: 13,
+              mainAxisSpacing: 13,
+              childAspectRatio: 1.45,
+              children: [
+                _AdminStatCard(
+                  title: 'Animal Reports',
+                  icon: Icons.crisis_alert_rounded,
+                  color: const Color(0xFFE66B55),
+                  stream: getCount('animalReports'),
+                ),
+
+                _AdminStatCard(
+                  title: 'Adoption Requests',
+                  icon: Icons.assignment_rounded,
+                  color: const Color(0xFF5586D9),
+                  stream: getCount('adoptionApplications'),
+                ),
+
+                _AdminStatCard(
+                  title: 'Available Pets',
+                  icon: Icons.pets_rounded,
+                  color: const Color(0xFF23977B),
+                  stream: getCount('pets'),
+                ),
+
+                _AdminStatCard(
+                  title: 'Pending Requests',
+                  icon: Icons.pending_actions_rounded,
+                  color: const Color(0xFFE4A344),
+                  stream: getPendingApplications(),
+                ),
+              ],
             ),
 
             const SizedBox(height: 30),
-          
-            // ANIMAL REPORTS
-            Card(
-              child: ListTile(
-                leading: const Icon(
-                  Icons.report_problem,
-                  size: 35,
-                ),
-                title: const Text(
-                  'Animal Reports',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                subtitle: const Text(
-                  'View and manage reported animals',
-                ),
-                trailing: const Icon(
-                  Icons.arrow_forward_ios,
-                  size: 18,
-                ),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) =>
-                      const AdminAnimalReportsPage(),
-                    ),
-                  );
-                },
+
+            // QUICK ACTIONS
+            const Text(
+              'Manage Your Application',
+              style: TextStyle(
+                fontSize: 21,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF193B33),
               ),
+            ),
+
+            const SizedBox(height: 5),
+
+            const Text(
+              'Choose an area to manage',
+              style: TextStyle(
+                color: Colors.grey,
+                fontSize: 13,
+              ),
+            ),
+
+            const SizedBox(height: 18),
+
+            _AdminActionCard(
+              title: 'Animal Reports',
+              subtitle: 'Review rescue requests and update their status',
+              icon: Icons.crisis_alert_rounded,
+              color: const Color(0xFFE66B55),
+              background: const Color(0xFFFFEFEB),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const AdminAnimalReportsPage(),
+                  ),
+                );
+              },
+            ),
+
+            _AdminActionCard(
+              title: 'Live Rescue Map',
+              subtitle: 'Locate animals that need immediate help',
+              icon: Icons.map_rounded,
+              color: const Color(0xFF168E79),
+              background: const Color(0xFFE5F5EF),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const RescueMapPage(),
+                  ),
+                );
+              },
+            ),
+
+            _AdminActionCard(
+              title: 'Adoption Applications',
+              subtitle: 'Review, approve or reject applications',
+              icon: Icons.assignment_rounded,
+              color: const Color(0xFF5586D9),
+              background: const Color(0xFFEBF1FF),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const AdoptionRequestsPage(),
+                  ),
+                );
+              },
+            ),
+
+            _AdminActionCard(
+              title: 'Manage Pets',
+              subtitle: 'Add new pets or update existing listings',
+              icon: Icons.pets_rounded,
+              color: const Color(0xFF9A70C7),
+              background: const Color(0xFFF3ECFA),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const ManagePetsPage(),
+                  ),
+                );
+              },
             ),
 
             const SizedBox(height: 15),
 
-            // LIVE RESCUE MAP
-            Card(
-              child: ListTile(
-                leading: const Icon(Icons.map, color: Colors.teal, size: 35),
-                title: const Text(
-                  'Live Rescue Map',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                subtitle: const Text('View reported animals on the map'),
-                trailing: const Icon(Icons.arrow_forward_ios, size: 18),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const RescueMapPage(),
+            // FOOTER
+            Center(
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.favorite,
+                    color: Colors.teal.shade300,
+                    size: 22,
+                  ),
+                  const SizedBox(height: 7),
+                  const Text(
+                    'Together, we make happy endings possible.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontSize: 12,
                     ),
-                  );
-                },
+                  ),
+                ],
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+class _AdminStatCard extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  final Color color;
+  final Stream<int> stream;
 
-            const SizedBox(height: 15),
+  const _AdminStatCard({
+    required this.title,
+    required this.icon,
+    required this.color,
+    required this.stream,
+  });
 
-            // ADOPTION APPLICATIONS
-            Card(
-              child: ListTile(
-                leading: const Icon(
-                  Icons.assignment,
-                  size: 35,
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(19),
+        border: Border.all(
+          color: color.withOpacity(0.12),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.035),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(9),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                title: const Text(
-                  'Adoption Applications',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
+                child: Icon(
+                  icon,
+                  color: color,
+                  size: 22,
+                ),
+              ),
+
+              Icon(
+                Icons.trending_up_rounded,
+                color: color.withOpacity(0.7),
+                size: 19,
+              ),
+            ],
+          ),
+
+          StreamBuilder<int>(
+            stream: stream,
+            builder: (context, snapshot) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    snapshot.hasError
+                        ? '--'
+                        : snapshot.hasData
+                            ? '${snapshot.data}'
+                            : '...',
+                    style: const TextStyle(
+                      fontSize: 25,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF193B33),
+                    ),
+                  ),
+
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
+class _AdminActionCard extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color color;
+  final Color background;
+  final VoidCallback onTap;
+
+  const _AdminActionCard({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.color,
+    required this.background,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 13),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(19),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.035),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(19),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(19),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  height: 53,
+                  width: 53,
+                  decoration: BoxDecoration(
+                    color: background,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: color,
+                    size: 27,
                   ),
                 ),
-                subtitle: const Text(
-                  'View and manage adoption applications',
-                ),
-                trailing: const Icon(
-                  Icons.arrow_forward_ios,
-                  size: 18,
-                ),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const AdoptionRequestsPage(),
-                    ),
-                  );
-                },
-              ),
-            ),
 
-            const SizedBox(height: 15),
+                const SizedBox(width: 15),
 
-            // PETS
-                       // PETS
-            Card(
-              child: ListTile(
-                leading: const Icon(
-                  Icons.pets,
-                  size: 35,
-                ),
-                title: const Text(
-                  'Manage Pets',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                          color: Color(0xFF193B33),
+                        ),
+                      ),
+
+                      const SizedBox(height: 5),
+
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
+                          color: Colors.grey,
+                          fontSize: 12,
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                subtitle: const Text(
-                  'Add, edit or remove pets',
+
+                const SizedBox(width: 8),
+
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 17,
+                  color: color,
                 ),
-                trailing: const Icon(
-                  Icons.arrow_forward_ios,
-                  size: 18,
-                ),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const ManagePetsPage(),
-                    ),
-                  );
-                },
-              ),
+              ],
             ),
-          ], // Closes Column children
-        ), // Closes Column
-      ), // Closes Padding
-    ); // Closes Scaffold
-  } // Closes build()
-} // Closes AdminDashboard
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 
 class AdminAnimalReportsPage extends StatefulWidget {
@@ -320,14 +698,29 @@ class AdminAnimalReportsPage extends StatefulWidget {
 
 class _AdminAnimalReportsPageState
     extends State<AdminAnimalReportsPage> {
-
   bool isLoading = true;
+
   List<QueryDocumentSnapshot<Map<String, dynamic>>> reports = [];
+
+  String selectedFilter = 'All';
+  final TextEditingController searchController = TextEditingController();
+
+  final List<String> statusOptions = [
+    'Pending',
+    'In Progress',
+    'Resolved',
+  ];
 
   @override
   void initState() {
     super.initState();
     loadReports();
+  }
+
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
   }
 
   Future<void> loadReports() async {
@@ -337,23 +730,29 @@ class _AdminAnimalReportsPageState
           .orderBy('date', descending: true)
           .get();
 
+      if (!mounted) return;
+
       setState(() {
         reports = snapshot.docs;
         isLoading = false;
       });
     } catch (e) {
-      print('Error loading reports: $e');
+      if (!mounted) return;
 
       setState(() {
         isLoading = false;
       });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not load reports: $e')),
+      );
     }
   }
 
   Future<void> updateReportStatus(
-      String reportId,
-      String newStatus,
-      ) async {
+    String reportId,
+    String newStatus,
+  ) async {
     try {
       await FirebaseFirestore.instance
           .collection('animalReports')
@@ -369,6 +768,7 @@ class _AdminAnimalReportsPageState
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Report marked as $newStatus'),
+          backgroundColor: Colors.teal,
         ),
       );
     } catch (e) {
@@ -377,142 +777,624 @@ class _AdminAnimalReportsPageState
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error updating report: $e'),
+          backgroundColor: Colors.red,
         ),
       );
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Animal Reports',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-          ),
+  Color getStatusColor(String status) {
+    switch (status) {
+      case 'Resolved':
+        return Colors.green;
+      case 'In Progress':
+        return Colors.orange.shade800;
+      default:
+        return Colors.red.shade700;
+    }
+  }
+
+  Color getConditionColor(String condition) {
+    final value = condition.toLowerCase();
+
+    if (value.contains('injured') || value.contains('critical')) {
+      return Colors.red;
+    } else if (value.contains('sick') || value.contains('ill')) {
+      return Colors.orange;
+    }
+
+    return Colors.teal;
+  }
+
+  String formatDate(dynamic date) {
+    if (date == null) return 'Date unavailable';
+
+    DateTime? parsedDate;
+
+    if (date is Timestamp) {
+      parsedDate = date.toDate();
+    } else if (date is DateTime) {
+      parsedDate = date;
+    }
+
+    if (parsedDate == null) return 'Date unavailable';
+
+    return '${parsedDate.day.toString().padLeft(2, '0')}/'
+        '${parsedDate.month.toString().padLeft(2, '0')}/'
+        '${parsedDate.year}';
+  }
+
+  List<QueryDocumentSnapshot<Map<String, dynamic>>>
+      get filteredReports {
+    return reports.where((doc) {
+      final data = doc.data();
+
+      final status = data['status'] ?? 'Pending';
+      final animalType =
+          (data['animalType'] ?? '').toString().toLowerCase();
+      final location =
+          (data['location'] ?? '').toString().toLowerCase();
+
+      final query = searchController.text.toLowerCase();
+
+      final matchesFilter =
+          selectedFilter == 'All' || status == selectedFilter;
+
+      final matchesSearch =
+          animalType.contains(query) || location.contains(query);
+
+      return matchesFilter && matchesSearch;
+    }).toList();
+  }
+
+  Widget buildStatCard(
+    String title,
+    int count,
+    IconData icon,
+    Color color,
+  ) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          vertical: 16,
+          horizontal: 8,
+        ),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color.withOpacity(0.2)),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 25),
+            const SizedBox(height: 8),
+            Text(
+              '$count',
+              style: const TextStyle(
+                fontSize: 23,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 11,
+                color: Colors.black54,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
         ),
       ),
+    );
+  }
 
-      body: isLoading
-          ? const Center(
-        child: CircularProgressIndicator(),
-      )
-          : reports.isEmpty
-          ? const Center(
-        child: Text(
-          'No animal reports found.',
-          style: TextStyle(
-            fontSize: 16,
-            color: Colors.grey,
-          ),
+  Widget buildStatusBadge(String status) {
+    final color = getStatusColor(status);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 11,
+        vertical: 6,
+      ),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        status,
+        style: TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
         ),
-      )
-          : ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: reports.length,
-        itemBuilder: (context, index) {
-          final report = reports[index].data();
+      ),
+    );
+  }
 
-          final status =
-              report['status'] ?? 'Pending';
-
-          return Card(
-            margin: const EdgeInsets.only(
-              bottom: 15,
+  Widget buildInfoRow(
+    IconData icon,
+    String text,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            icon,
+            size: 18,
+            color: Colors.teal.shade600,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                fontSize: 13,
+                color: Colors.black87,
+              ),
             ),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment:
-                CrossAxisAlignment.start,
-                children: [
+          ),
+        ],
+      ),
+    );
+  }
 
-                  Row(
+  Widget buildReportCard(
+    QueryDocumentSnapshot<Map<String, dynamic>> document,
+  ) {
+    final report = document.data();
+
+    final animalType = report['animalType'] ?? 'Unknown Animal';
+    final condition = report['condition'] ?? 'Not specified';
+    final location = report['location'] ?? 'Not specified';
+    final description = report['description'] ?? 'No description';
+    final imagePath = report['imagePath']?.toString() ?? '';
+
+    final rawStatus = report['status'] ?? 'Pending';
+
+    final status = statusOptions.contains(rawStatus)
+        ? rawStatus
+        : 'Pending';
+
+    final conditionColor = getConditionColor(condition);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.teal.shade50),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.teal.withOpacity(0.06),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ANIMAL INFORMATION
+            Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: imagePath.isNotEmpty
+                      ? Image.network(
+                          imagePath,
+                          height: 65,
+                          width: 65,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return animalPlaceholder();
+                          },
+                        )
+                      : animalPlaceholder(),
+                ),
+
+                const SizedBox(width: 13),
+
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(
-                        Icons.report_problem,
-                        size: 30,
-                      ),
-
-                      const SizedBox(width: 10),
-
-                      Expanded(
-                        child: Text(
-                          report['animalType'] ?? '',
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
+                      Text(
+                        animalType,
+                        style: const TextStyle(
+                          fontSize: 19,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-
-                      Chip(
-                        label: Text(status),
+                      const SizedBox(height: 5),
+                      Text(
+                        'Reported on ${formatDate(report['date'])}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey,
+                        ),
                       ),
                     ],
                   ),
+                ),
 
-                  const SizedBox(height: 15),
+                buildStatusBadge(status),
+              ],
+            ),
 
-                  Text(
-                    'Condition: ${report['condition'] ?? ''}',
+            const SizedBox(height: 18),
+
+            // CONDITION
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 11,
+                vertical: 7,
+              ),
+              decoration: BoxDecoration(
+                color: conditionColor.withOpacity(0.09),
+                borderRadius: BorderRadius.circular(9),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.health_and_safety_outlined,
+                    size: 16,
+                    color: conditionColor,
                   ),
-
-                  const SizedBox(height: 8),
-
+                  const SizedBox(width: 6),
                   Text(
-                    'Location: ${report['location'] ?? ''}',
-                  ),
-
-                  const SizedBox(height: 8),
-
-                  Text(
-                    'Description: ${report['description'] ?? ''}',
-                  ),
-
-                  const SizedBox(height: 15),
-
-                  DropdownButtonFormField<String>(
-                    value: status,
-                    decoration:
-                    const InputDecoration(
-                      labelText: 'Update Status',
-                      border: OutlineInputBorder(),
+                    condition,
+                    style: TextStyle(
+                      color: conditionColor,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
                     ),
-                    items: const [
-                      DropdownMenuItem(
-                        value: 'Pending',
-                        child: Text('Pending'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'In Progress',
-                        child: Text('In Progress'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'Resolved',
-                        child: Text('Resolved'),
-                      ),
-                    ],
-                    onChanged: (value) {
-                      if (value != null &&
-                          value != status) {
-                        updateReportStatus(
-                          reports[index].id,
-                          value,
-                        );
-                      }
-                    },
                   ),
                 ],
               ),
             ),
-          );
-        },
+
+            const SizedBox(height: 15),
+
+            buildInfoRow(
+              Icons.location_on_outlined,
+              location,
+            ),
+
+            buildInfoRow(
+              Icons.notes_outlined,
+              description,
+            ),
+
+            const Divider(height: 22),
+
+            // STATUS UPDATE
+            const Text(
+              'Manage Report',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+              ),
+            ),
+
+            const SizedBox(height: 10),
+
+            DropdownButtonFormField<String>(
+              value: status,
+              decoration: InputDecoration(
+                prefixIcon: const Icon(
+                  Icons.edit_note,
+                  color: Colors.teal,
+                ),
+                filled: true,
+                fillColor: Colors.teal.shade50.withOpacity(0.5),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              items: statusOptions.map((value) {
+                return DropdownMenuItem<String>(
+                  value: value,
+                  child: Text(value),
+                );
+              }).toList(),
+              onChanged: (value) {
+                if (value != null && value != status) {
+                  updateReportStatus(document.id, value);
+                }
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
+
+  Widget animalPlaceholder() {
+    return Container(
+      height: 65,
+      width: 65,
+      decoration: BoxDecoration(
+        color: Colors.teal.shade50,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Icon(
+        Icons.pets,
+        size: 32,
+        color: Colors.teal.shade600,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pendingCount = reports.where(
+      (doc) => (doc.data()['status'] ?? 'Pending') == 'Pending',
+    ).length;
+
+    final progressCount = reports.where(
+      (doc) => doc.data()['status'] == 'In Progress',
+    ).length;
+
+    final resolvedCount = reports.where(
+      (doc) => doc.data()['status'] == 'Resolved',
+    ).length;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF2F8F6),
+
+      appBar: AppBar(
+        backgroundColor: const Color(0xFFF2F8F6),
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        title: const Text(
+          'Animal Reports',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 21,
+          ),
+        ),
+        actions: [
+          IconButton(
+            onPressed: loadReports,
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh reports',
+          ),
+          const SizedBox(width: 5),
+        ],
+      ),
+
+      body: isLoading
+          ? const Center(
+              child: CircularProgressIndicator(color: Colors.teal),
+            )
+          : RefreshIndicator(
+              onRefresh: loadReports,
+              color: Colors.teal,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                children: [
+                  // PAGE INTRODUCTION
+                  const Text(
+                    'Rescue Center',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.teal,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+
+                  const SizedBox(height: 5),
+
+                  const Text(
+                    'Manage Animal Reports',
+                    style: TextStyle(
+                      fontSize: 23,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+
+                  const SizedBox(height: 5),
+
+                  const Text(
+                    'Keep track of animals that need your help.',
+                    style: TextStyle(
+                      color: Colors.black54,
+                      fontSize: 13,
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // SUMMARY CARDS
+                  Row(
+                    children: [
+                      buildStatCard(
+                        'Total',
+                        reports.length,
+                        Icons.pets,
+                        Colors.teal,
+                      ),
+                      const SizedBox(width: 9),
+                      buildStatCard(
+                        'Pending',
+                        pendingCount,
+                        Icons.access_time,
+                        Colors.orange,
+                      ),
+                      const SizedBox(width: 9),
+                      buildStatCard(
+                        'Resolved',
+                        resolvedCount,
+                        Icons.check_circle_outline,
+                        Colors.green,
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 22),
+
+                  // SEARCH
+                  TextField(
+                    controller: searchController,
+                    onChanged: (value) {
+                      setState(() {});
+                    },
+                    decoration: InputDecoration(
+                      hintText: 'Search animal or location...',
+                      prefixIcon: const Icon(
+                        Icons.search,
+                        color: Colors.teal,
+                      ),
+                      suffixIcon: searchController.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.close),
+                              onPressed: () {
+                                searchController.clear();
+                                setState(() {});
+                              },
+                            )
+                          : null,
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 18),
+
+                  // FILTERS
+                  const Text(
+                    'Filter Reports',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        'All',
+                        'Pending',
+                        'In Progress',
+                        'Resolved',
+                      ].map((filter) {
+                        final selected = selectedFilter == filter;
+
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: ChoiceChip(
+                            label: Text(filter),
+                            selected: selected,
+                            selectedColor: Colors.teal,
+                            backgroundColor: Colors.white,
+                            labelStyle: TextStyle(
+                              color: selected
+                                  ? Colors.white
+                                  : Colors.black87,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                            ),
+                            onSelected: (value) {
+                              setState(() {
+                                selectedFilter = filter;
+                              });
+                            },
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // REPORT COUNT
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Submitted Reports',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        '${filteredReports.length} found',
+                        style: const TextStyle(
+                          color: Colors.teal,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 14),
+
+                  // REPORT LIST
+                  if (filteredReports.isEmpty)
+                    Container(
+                      padding: const EdgeInsets.all(30),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.pets,
+                            size: 45,
+                            color: Colors.teal.shade200,
+                          ),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'No reports found',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          const SizedBox(height: 5),
+                          const Text(
+                            'Try changing your search or filter.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.grey,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    ...filteredReports.map(buildReportCard),
+                ],
+              ),
+            ),
+    );
+  }
 }
+
 
 // ============== PET MODEL ==============
 
@@ -1119,7 +2001,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         'location': report.location,
         'condition': report.condition,
         'description': report.description,
-        'imagePath': null,
+        'imagePath': report.imagePath,
         'date': Timestamp.fromDate(report.date),
         'status': report.status,
       });
